@@ -35,7 +35,7 @@ Agent 开始工作前必须按顺序读取：
 2. `openspec/modules/*.spec.md`
 3. 当前任务对应的 `openspec/changes/<change-id>/`
 4. `README.md`
-5. `docs/prd/V1.md`
+5. `docs/prd/V1.0 PRD.md`
 6. `docs/planning/development-plan.md`
 7. `docs/development/openspec-workflow.md`
 8. `docs/development/git-workflow.md`

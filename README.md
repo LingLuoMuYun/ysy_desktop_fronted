@@ -4,13 +4,13 @@
 
 面向本地深度学习实验和轻量大模型工作流的桌面应用。项目目标是把项目管理、环境配置、模型训练、模型服务和 AI 助手统一到一个前后端分离的产品中。
 
-当前仓库处于 0-1 规划和工程初始化阶段，`V1.pdf` 是原始 PRD，Markdown 版需求和开发规范已整理到 `docs/`。
+当前仓库处于 0-1 规划和工程初始化阶段，最新 PRD 稳定版本已整理到 `docs/prd/V1.0 PRD.md`。
 
 当前技术方向：前后端分离，前端 / 桌面端采用 React + Electron，业务后端采用 Python，AI 助手与智能编排部分采用 Python，数据库暂未确定。
 
 ## 文档入口
 
-- [V1 PRD](docs/prd/V1.md)
+- [V1.0 PRD](<docs/prd/V1.0 PRD.md>)
 - [0-1 开发规划](docs/planning/development-plan.md)
 - [Vibe Coding 协作规范](docs/process/vibe-coding.md)
 - [需求变更规范](docs/specs/README.md)
