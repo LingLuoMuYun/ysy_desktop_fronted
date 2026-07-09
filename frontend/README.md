@@ -27,6 +27,10 @@ pnpm run typecheck         # TypeScript 类型检查
 | `pnpm run preview` | 预览生产构建 | 4174 |
 | `pnpm run electron:preview` | 构建后用 Electron 打开生产产物 | - |
 | `pnpm run typecheck` | TypeScript 类型检查 | - |
+| `pnpm run electron:package` | 打包当前平台安装包 | - |
+| `pnpm run electron:package:win` | 打包 Windows 安装包 | - |
+| `pnpm run electron:package:mac` | 打包 macOS 安装包 | - |
+| `pnpm run electron:package:linux` | 打包 Linux 安装包 | - |
 
 ## 运行环境
 
@@ -166,3 +170,31 @@ frontend/
 |------|------|
 | 5174 | Vite 开发服务器 |
 | 4174 | Vite 预览服务器 |
+
+## 打包安装包
+
+使用 `electron-builder` 生成桌面安装包。
+
+```bash
+# 打包当前平台
+pnpm run electron:package
+
+# 仅打包 Windows（需在 Windows 上运行）
+pnpm run electron:package:win
+
+# 仅打包 macOS
+pnpm run electron:package:mac
+
+# 仅打包 Linux
+pnpm run electron:package:linux
+```
+
+**输出目录**：`release/`
+
+| 平台 | 产物 |
+|------|------|
+| Windows | `.exe` 安装包（NSIS）+ `.exe` 便携版 |
+| macOS | `.dmg` 磁盘映像（x64 + arm64） |
+| Linux | `.AppImage` 可执行文件 |
+
+> **注意**：Windows 安装包需要在 Windows 系统上构建（NSIS 依赖）。在 macOS 上交叉编译 Windows 包需要额外配置 Wine。建议在各目标平台原生构建。

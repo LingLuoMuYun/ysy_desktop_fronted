@@ -10,7 +10,61 @@
     "preview": "vite preview --host 0.0.0.0",
     "electron:dev": "node scripts/run-electron-dev.cjs",
     "electron:preview": "pnpm run build && electron electron/main/index.js",
+    "electron:package": "pnpm run build && electron-builder",
+    "electron:package:win": "pnpm run build && electron-builder --win",
+    "electron:package:mac": "pnpm run build && electron-builder --mac",
+    "electron:package:linux": "pnpm run build && electron-builder --linux",
     "typecheck": "tsc -b"
+  },
+  "build": {
+    "appId": "com.ysy.desktop",
+    "productName": "桌面智算",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "桌面智算"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Development"
+    }
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",
@@ -24,6 +78,7 @@
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "electron-builder": "^26.15.3",
     "playwright": "^1.61.1"
   }
 }
