@@ -2,7 +2,7 @@
 
 面向本地深度学习实验和轻量大模型工作流的桌面应用。帮助用户在一台本机上完成 AI 项目管理、数据导入与检查、训练任务执行、推理服务创建、模型资产沉淀、运行环境管理和 AI 辅助诊断。
 
-当前仓库处于 V1.0 原型到联调阶段：前端桌面壳、首页、设置页、AI 助手面板和部分后端接口适配已落地，最新 PRD 稳定版本见 [docs/prd/V1.0 PRD.md](docs/prd/V1.0%20PRD.md)。
+当前仓库处于 V1.0 原型到联调阶段：前端桌面壳、首页、设置页、AI 助手面板、AI 助手接口和设置页运行环境接口适配已落地，最新 PRD 稳定版本见 [docs/prd/V1.0 PRD.md](docs/prd/V1.0%20PRD.md)。
 
 ## 功能模块
 
@@ -13,7 +13,7 @@
 | 任务 | `/tasks` | 训练 / 部署任务的创建、执行、监控和日志查看 |
 | 数据 | `/data` | 数据集导入、格式检查、质量分析和版本管理 |
 | 模型 | `/models` | 模型资产导入、登记、检查、版本对比和推理部署 |
-| 设置 | `/settings` | 运行环境管理（含详情页：检测结果、使用建议）、AI 助手模型配置（含详情页：链接信息、生成参数、连接状态）、用户偏好设置 |
+| 设置 | `/settings` | 运行环境管理（列表、系统环境创建、自定义环境创建、导入本地环境、删除）、AI 助手模型配置（模型列表、默认模型、连接测试）、用户偏好设置 |
 
 **全局能力：**
 
@@ -42,7 +42,7 @@
 | Python | 业务后端、任务执行器、数据/模型/环境检测 |
 | AI Agent | 上下文组装、日志诊断、动作请求、受控工具编排 |
 
-默认后端 API Base 为 `http://10.0.1.5:8765`。前端服务层可通过 `VITE_API_BASE_URL` 覆盖；开发环境中若浏览器直连失败，会回退到 Vite 同源代理。
+前端当前对接两个后端入口：AI 助手 / chat runtime 默认 `http://10.0.1.5:8765`，运行环境业务后端默认 `http://10.0.1.5:8000`。`VITE_API_BASE_URL` 可覆盖通用 API Base，`VITE_ENVIRONMENTS_API_BASE_URL` 可单独覆盖环境业务后端；开发环境中若浏览器直连失败，会回退到 Vite 同源代理。
 
 ## 项目结构
 
@@ -58,7 +58,7 @@ ysy_desktop/
 │   │   ├── layouts/           # 布局组件（AppShell、Sidebar、WindowTitleBar、AssistantPanel 等）
 │   │   ├── mocks/             # Mock 原型数据
 │   │   ├── pages/             # 页面组件（Home、Projects、Tasks、Data、Models、Settings）
-│   │   ├── services/          # API / IPC 服务层（模型配置、聊天、会话等）
+│   │   ├── services/          # API / IPC 服务层（环境、模型配置、聊天、会话等）
 │   │   ├── stores/            # 全局状态 Store（规划中）
 │   │   ├── styles/            # 全局样式与 CSS 设计 Token
 │   │   └── types/             # TypeScript 领域类型定义
@@ -122,10 +122,11 @@ pnpm run electron:dev
 
 该命令会启动 Vite `http://localhost:5174/`，等待服务可访问后打开 Electron。桌面壳使用 Windows/macOS 系统原生标题栏，初始最小窗口尺寸为 `1100x720`。
 
-默认后端地址为 `http://10.0.1.5:8765`。如需临时切换：
+默认 AI 助手后端地址为 `http://10.0.1.5:8765`，默认环境业务后端地址为 `http://10.0.1.5:8000`。如需临时切换：
 
 ```bash
 VITE_API_BASE_URL=http://127.0.0.1:8765 pnpm run electron:dev
+VITE_ENVIRONMENTS_API_BASE_URL=http://127.0.0.1:8000 pnpm run electron:dev
 ```
 
 ### 启动 Web 开发服务器
@@ -178,9 +179,9 @@ pnpm run electron:preview
 - [前端 README](frontend/README.md) — 前端工程说明与启动方式
 - [前端 AGENTS.md](frontend/AGENTS.md) — 前端 AI 编码规则
 - [前端 OpenSpec](openspec/frontend/) — 前端 Global Spec、Module Spec、Changes
-- [前端接口替换文档](docs/前端接口替换文档v2.md)
-- [后端接口文档](docs/后端接口文档.md)
-- [智能体接口文档](docs/智能体接口.md)
+- [前端接口替换文档](frontend/docs/前端接口替换文档v2.md)
+- [后端接口文档](frontend/docs/后端接口文档.md)
+- [智能体接口文档](frontend/docs/智能体接口.md)
 - [Electron 桌面端启动说明](frontend/docs/electron-setup.md)
 
 ## 服务器环境

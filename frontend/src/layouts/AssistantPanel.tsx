@@ -1,6 +1,7 @@
 import { Bot, ChevronDown, History, MessageSquarePlus, RefreshCw, SendHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { RouteKey } from "../app/router";
+import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { PromptToolbar, ProjectSelect } from "../components/PromptToolbar";
 import { StatusBadge } from "../components/StatusBadge";
 import type { AssistantModelDetail } from "../types/domain";
@@ -173,7 +174,14 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
             >
               <div className="chat-message__bubble">
                 {msg.text ? (
-                  <div>{msg.text}</div>
+                  <MarkdownRenderer
+                    content={msg.text}
+                    isStreaming={
+                      isStreaming &&
+                      msg.role === "assistant" &&
+                      msg.id === messages[messages.length - 1]?.id
+                    }
+                  />
                 ) : (
                   <div className="chat-message__streaming">
                     <span className="chat-message__streaming-dot" />

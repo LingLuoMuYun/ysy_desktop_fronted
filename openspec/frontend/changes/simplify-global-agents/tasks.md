@@ -16,4 +16,4 @@
 - [x] 标记未确认前端工具链为待确认，不作为默认技术事实。
 - [x] 精简 `frontend/AGENTS.md` 行文，突出项目注意点和可执行规则。
 - [x] 运行验证。
-- [ ] git commit。
+- [x] git commit。

@@ -1,9 +1,12 @@
 const { spawn } = require("node:child_process");
 const http = require("node:http");
+const path = require("node:path");
 
 const DEV_SERVER_URL = "http://localhost:5174";
 const isWindows = process.platform === "win32";
-const viteBin = isWindows ? "node_modules\\.bin\\vite.cmd" : "node_modules/.bin/vite";
+const viteBin = isWindows
+  ? path.join("node_modules", ".bin", "vite.cmd")
+  : path.join("node_modules", ".bin", "vite");
 const electronBin = String(require("electron")).trim();
 
 let electronProcess;

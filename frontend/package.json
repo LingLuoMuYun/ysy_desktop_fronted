@@ -27,17 +27,25 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "!electron/main/index-simple.mjs",
+      "!electron/main/index-test.mjs",
+      "!electron/main/index.d.ts",
       "package.json"
     ],
     "win": {
+      "icon": "resources/icon.ico",
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -47,22 +55,35 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "桌面智算"
+      "shortcutName": "桌面智算",
+      "installerIcon": "resources/icon.ico",
+      "installerHeaderIcon": "resources/icon.ico",
+      "uninstallDisplayName": "桌面智算",
+      "menuCategory": "桌面智算",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
     },
     "mac": {
+      "icon": "resources/icon.icns",
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "category": "public.app-category.developer-tools"
     },
     "linux": {
+      "icon": "resources/icon.png",
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "category": "Development"
@@ -73,6 +94,9 @@
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
     "typescript": "^5.8.0",
     "vite": "^7.0.0"
   },

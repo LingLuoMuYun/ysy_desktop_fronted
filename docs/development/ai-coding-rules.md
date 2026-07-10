@@ -6,13 +6,13 @@
 
 AI 开始开发前必须按顺序读取：
 
-1. `openspec/global/global.spec.md`
-2. `openspec/modules/*.spec.md`
-3. 当前 `openspec/changes/<change-id>/`
+1. `openspec/frontend/global/global.spec.md`
+2. `openspec/frontend/modules/*.spec.md`
+3. 当前 `openspec/frontend/changes/<change-id>/`（前端需求）或 `openspec/changes/<change-id>/`（跨模块变更）
 4. `AGENTS.md`
 5. 相关代码文件、测试和 API 契约
 
-本仓库已按 OpenSpec 体系重建，需求变更统一读取 `openspec/changes/`。
+本仓库已按 OpenSpec 体系重建，需求变更统一读取 `openspec/frontend/changes/`（前端需求）或 `openspec/changes/`（跨模块变更）。
 
 ## AI 必须遵守的规则
 
@@ -51,6 +51,7 @@ backend/
 agent/
 packages/shared/
 tests/
+openspec/frontend/changes/
 openspec/changes/
 docs/
 ```
@@ -60,8 +61,8 @@ docs/
 除非用户明确要求，AI 不应直接修改：
 
 ```text
-openspec/global/
-openspec/modules/
+openspec/frontend/global/
+openspec/frontend/modules/
 AGENTS.md
 ```
 

@@ -11,6 +11,8 @@
 - 缺少空态展示
 - 模型详情字段（API Base URL、API Key、连接状态、生成参数）无法查看
 
+后续联调补充：设置页运行环境 Tab 已从 mock 列表升级为对接环境业务后端。环境业务后端默认 `http://10.0.1.5:8000`，AI / chat runtime 默认 `http://10.0.1.5:8765`，前端通过独立 service 和 Vite proxy 区分两类 API。
+
 ## 目标
 
 在保持 SettingsPage 现有架构（单文件 Page 组件）的前提下，增强以下功能：
@@ -25,10 +27,10 @@
 ## 非目标
 
 - 不实施 Page → Feature → Hook → Component 架构拆分（留待后续 Change）
-- 不接入真实后端 API 或 Electron IPC
-- 不实现真实环境检测、模型连接测试
+- 本 Change 初始范围不接入真实后端 API 或 Electron IPC；后续联调已补充运行环境列表、创建、导入和删除 API。
+- 当前运行后端若未暴露环境检测 API，前端只保留入口并提示不可用。
 - 不修改全局布局（AppShell / Sidebar / WindowTitleBar）
-- 高风险操作（删除、检测）保持 mock / 占位，不执行真实动作
+- 环境创建和删除已按后端高风险契约接入确认；环境检测在后端接口暴露前保持占位提示。
 
 ## 影响范围
 
@@ -36,6 +38,8 @@
 - 修改：`frontend/src/types/domain.ts`（新增 RuntimeEnvironmentDetail、AssistantModelDetail、EnvironmentCheckItem）
 - 修改：`frontend/src/mocks/prototypeData.ts`（新增详情 mock 数据、修正 QLoRA tone）
 - 修改：`frontend/src/styles/globals.css`（新增 ~150 行详情页样式）
+- 后续联调新增：`frontend/src/services/environmentsApi.ts`（运行环境列表、创建、导入、删除）
+- 后续联调修改：`frontend/vite.config.ts`（`/api/environments` 和 `/api/health` 代理到 `8000`，其他 `/api` 代理到 `8765`）
 - 新增：`openspec/frontend/changes/improve-settings-page/`（本 Change）
 
 ## 用户流程
@@ -46,6 +50,14 @@
 3. 点击环境卡片 → 整页切换至环境详情页
 4. 详情页展示：头部（返回按钮 + 图标 + 名称 + 用途标签 + 状态 + 操作按钮）、基础信息、检测结果列表、使用建议
 5. 点击 X 按钮返回列表
+
+### 运行环境后端联调
+1. 用户进入设置 > 环境 Tab，前端调用 `GET /api/environments` 获取环境卡片列表。
+2. 用户点击创建环境，系统环境仅提供“大模型推理 / LLM”；提交时带 `confirmed=true` 和 `Idempotency-Key`。
+3. 系统环境提交 `mode=system`、`category=llm_inference`、`taskType=llm`，环境名称和保存路径由后端生成。
+4. 自定义环境提交 `mode=custom`、`name`、`purpose`、`python`、`packageManager`、`savePath`、`dependencyFilePath`、`packages=[]`。
+5. 创建成功后前端展示后台任务已提交，并把返回的环境摘要加入列表。
+6. 删除环境时前端提交 `confirmed=true`、`deleteLocalFiles` 和必要的 `deleteLocalFilesConfirmed`；本地删除选项由 `canDeleteLocalFiles` 控制。
 
 ### 模型详情
 1. 用户切换到 AI 助手 Tab，看到模型卡片列表

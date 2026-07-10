@@ -14,4 +14,4 @@
 - [x] 更新 AGENTS 和开发规范中的路径。
 - [x] 更新 Module Spec 中的路径和技术边界。
 - [x] 运行文档验证。
-- [ ] git commit。
+- [x] git commit。

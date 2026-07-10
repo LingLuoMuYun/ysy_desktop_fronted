@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { ArrowUp, Link2, Lightbulb, RefreshCw, X } from "lucide-react";
+import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { PromptToolbar, ProjectSelect, type SkillOption } from "../components/PromptToolbar";
 import { suggestionSets, type SuggestionItem } from "../mocks/prototypeData";
 import { chatApi } from "../services/chatApi";
@@ -424,7 +425,22 @@ export function HomePage({ messages = [], onConversationTitleChange, onMessagesC
                       ))}
                     </div>
                   )}
-                  <div>{message.text}</div>
+                  {message.text ? (
+                    <MarkdownRenderer
+                      content={message.text}
+                      isStreaming={
+                        isStreaming &&
+                        message.role === "assistant" &&
+                        message.id === messages[messages.length - 1]?.id
+                      }
+                    />
+                  ) : (
+                    <div className="chat-message__streaming">
+                      <span className="chat-message__streaming-dot" />
+                      <span className="chat-message__streaming-dot" />
+                      <span className="chat-message__streaming-dot" />
+                    </div>
+                  )}
                 </div>
                 <time>{message.time}</time>
               </article>

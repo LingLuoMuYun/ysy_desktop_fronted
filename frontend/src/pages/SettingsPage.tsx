@@ -1,13 +1,31 @@
 import { Activity, Bot, CheckCircle2, FolderOpen, Info, Pencil, Plus, RotateCw, Save, Star, Trash2, User, X, XCircle, Zap } from "lucide-react";
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { StatusBadge } from "../components/StatusBadge";
-import { assistantModelDetails, assistantModels, runtimeEnvironments } from "../mocks/prototypeData";
+import { assistantModelDetails, assistantModels } from "../mocks/prototypeData";
 import { assistantModelsApi, type AssistantModelFormInput } from "../services/assistantModelsApi";
+import { environmentsApi, type EnvironmentCreateInput, type EnvironmentImportInput } from "../services/environmentsApi";
 import type { AssistantModelDetail, RuntimeEnvironmentSummary } from "../types/domain";
 
 type SettingsTab = "environment" | "assistant" | "profile";
 type EnvironmentCreateMode = "system" | "import" | "custom";
 type EnvironmentDeleteScope = "database" | "local-and-database";
+
+const SYSTEM_TEMPLATE_GROUPS = [
+  { key: "dl", title: "深度学习", items: ["目标检测", "图像分类", "语义检测"] },
+  { key: "llm-train", title: "大模型训练", items: ["LLM", "Embedding", "Rerank"] },
+  { key: "llm-infer", title: "大模型推理", items: ["LLM", "Embedding", "Rerank"] },
+] as const;
+
+const SUPPORTED_SYSTEM_TEMPLATE = "llm-infer:LLM";
+
+function normalizeLocalPath(value: string) {
+  return value.trim().replace(/\\/g, "/");
+}
+
+function isAbsoluteLocalPath(value: string) {
+  const normalized = normalizeLocalPath(value);
+  return normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized);
+}
 
 const tabs: Array<{ key: SettingsTab; label: string }> = [
   { key: "environment", label: "环境" },
@@ -27,7 +45,7 @@ function maskApiKey(key: string): string {
 export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("environment");
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  const [envList, setEnvList] = useState(runtimeEnvironments);
+  const [envList, setEnvList] = useState<RuntimeEnvironmentSummary[]>([]);
   const [modelList, setModelList] = useState(assistantModels);
   const [modelDetails, setModelDetails] = useState(assistantModelDetails);
   const [deleteTarget, setDeleteTarget] = useState<RuntimeEnvironmentSummary | null>(null);
@@ -35,6 +53,8 @@ export function SettingsPage() {
   const [isCreateEnvironmentOpen, setIsCreateEnvironmentOpen] = useState(false);
   const [isAddModelOpen, setIsAddModelOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "danger" } | null>(null);
+  const [isEnvironmentLoading, setIsEnvironmentLoading] = useState(false);
+  const [checkingEnvironmentIds, setCheckingEnvironmentIds] = useState<Set<string>>(new Set());
   const [isModelLoading, setIsModelLoading] = useState(false);
 
   // 5 秒后自动消失
@@ -69,6 +89,37 @@ export function SettingsPage() {
   useEffect(() => {
     let cancelled = false;
 
+    async function loadEnvironments() {
+      setIsEnvironmentLoading(true);
+      try {
+        const { environments, omittedCount } = await environmentsApi.list();
+        if (!cancelled) {
+          setEnvList(environments);
+          if (omittedCount > 0) {
+            showError(`已加载 ${environments.length} 个环境，另有 ${omittedCount} 条后端异常记录暂时无法显示`);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          showError(error instanceof Error ? error.message : "环境列表加载失败");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsEnvironmentLoading(false);
+        }
+      }
+    }
+
+    loadEnvironments();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
     async function loadAssistantModels() {
       setIsModelLoading(true);
       try {
@@ -95,10 +146,24 @@ export function SettingsPage() {
     };
   }, []);
 
-  const handleDeleteConfirm = (_scope: EnvironmentDeleteScope) => {
+  const handleDeleteConfirm = async (scope: EnvironmentDeleteScope) => {
     if (!deleteTarget) return;
-    setEnvList((prev) => prev.filter((e) => e.id !== deleteTarget.id));
-    setDeleteTarget(null);
+    try {
+      await environmentsApi.delete(deleteTarget.id, {
+        deleteLocalFiles: scope === "local-and-database",
+        deleteLocalFilesConfirmed: scope === "local-and-database",
+      });
+      setEnvList((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+      setToast({ message: `${deleteTarget.name} 已删除`, tone: "success" });
+      setDeleteTarget(null);
+    } catch (error) {
+      showError(error instanceof Error ? error.message : "环境删除失败");
+      setDeleteTarget(null);
+    }
+  };
+
+  const handleDetectEnvironment = async (environment: RuntimeEnvironmentSummary) => {
+    setToast({ message: `${environment.name}：当前后端暂未开放环境检测接口`, tone: "danger" });
   };
 
   const handleModelDeleteConfirm = () => {
@@ -182,8 +247,10 @@ export function SettingsPage() {
           {activeTab === "environment" ? (
             <EnvironmentSettings
               environments={envList}
+              isLoading={isEnvironmentLoading}
+              checkingEnvironmentIds={checkingEnvironmentIds}
               onDelete={setDeleteTarget}
-              onDetect={(name) => setToast({ message: `正在检测 ${name} ...`, tone: "success" })}
+              onDetect={handleDetectEnvironment}
             />
           ) : null}
           {activeTab === "assistant" ? (
@@ -334,8 +401,12 @@ export function SettingsPage() {
       {isCreateEnvironmentOpen ? (
         <CreateEnvironmentDialog
           onClose={() => setIsCreateEnvironmentOpen(false)}
-          onCreated={(newEnv) => {
+          onCreate={async (input) => {
+            const newEnv = input.kind === "import"
+              ? await environmentsApi.importLocal(input.payload)
+              : await environmentsApi.create(input.payload);
             setEnvList((prev) => [newEnv, ...prev]);
+            return newEnv;
           }}
         />
       ) : null}
@@ -343,16 +414,20 @@ export function SettingsPage() {
   );
 }
 
-const ENV_PURPOSE_OPTIONS = ["训练", "部署服务", "LLM微调", "Embedding微调", "rerank微调", "大模型推理"];
-const ENV_TYPE_OPTIONS = ["conda", "venv", "系统python", "docker镜像"];
+const ENV_PURPOSE_OPTIONS = ["训练", "部署服务", "LLM 微调", "Embedding 微调", "Rerank 微调", "大模型推理"];
+const ENV_TYPE_OPTIONS = ["conda", "venv", "python"];
 const ENV_MANAGER_OPTIONS = ["conda+pip", "uv", "pip", "mamba"];
+
+type CreateEnvironmentSubmission =
+  | { kind: "create"; payload: EnvironmentCreateInput }
+  | { kind: "import"; payload: EnvironmentImportInput };
 
 interface CreateEnvironmentDialogProps {
   onClose: () => void;
-  onCreated: (env: RuntimeEnvironmentSummary) => void;
+  onCreate: (input: CreateEnvironmentSubmission) => Promise<RuntimeEnvironmentSummary>;
 }
 
-function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialogProps) {
+function CreateEnvironmentDialog({ onClose, onCreate }: CreateEnvironmentDialogProps) {
   const [mode, setMode] = useState<EnvironmentCreateMode>("system");
 
   // ---- shared form state ----
@@ -364,7 +439,7 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
   const [envPath, setEnvPath] = useState("D:/envs/pytorch-general");
   const [pythonInterpreterPath, setPythonInterpreterPath] = useState("D:/envs/pytorch-general/python.exe");
   const [condaEnvName, setCondaEnvName] = useState("pytorch-general");
-  const [packageSource, setPackageSource] = useState("清华 PyPI / pytorch cuda channel");
+  const [packageSource, setPackageSource] = useState("https://pypi.tuna.tsinghua.edu.cn/simple");
   const [projectDir, setProjectDir] = useState("D:/workspace/defect-detection");
   const [dependencyFile, setDependencyFile] = useState("D:/workspace/defect-detection/requirements.txt");
   const [autoDetect, setAutoDetect] = useState(true);
@@ -375,6 +450,8 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
   // ---- confirmation & success flow ----
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const createTabs: Array<{ key: EnvironmentCreateMode; label: string }> = [
     { key: "system", label: "创建系统环境" },
@@ -383,41 +460,115 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
   ];
 
   const actionLabel =
-    mode === "system" ? "创建环境" : mode === "import" ? "导入环境" : "生成计划";
+    mode === "system" ? "创建环境" : mode === "import" ? "导入环境" : "创建环境";
 
   const handleAction = () => {
+    setSubmitError(null);
+    if (
+      mode === "system"
+      && (selectedTemplates.size !== 1 || !selectedTemplates.has(SUPPORTED_SYSTEM_TEMPLATE))
+    ) {
+      setSubmitError("当前后端仅支持“大模型推理 / LLM”系统模板。其他模板请通过“自定义环境”创建。");
+      return;
+    }
+
+    const pathsToValidate = mode === "import"
+      ? [
+          ["本地环境路径", envPath],
+          ["Python 解释器路径", pythonInterpreterPath],
+        ]
+      : mode === "custom"
+        ? [
+            ["环境保存路径", envPath],
+            ["项目目录", projectDir],
+            ["依赖文件", dependencyFile],
+          ]
+        : [];
+    const invalidPath = pathsToValidate.find(([, value]) => !isAbsoluteLocalPath(value));
+    if (invalidPath) {
+      setSubmitError(`${invalidPath[0]}必须填写绝对路径`);
+      return;
+    }
     setShowConfirm(true);
   };
 
-  const handleConfirm = () => {
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const buildCreatePayload = (): CreateEnvironmentSubmission => {
+    if (mode === "import") {
+      return {
+        kind: "import",
+        payload: {
+          name: envName.trim(),
+          purpose: envPurpose,
+          environmentPath: envPath.trim(),
+          pythonPath: pythonInterpreterPath.trim(),
+          environmentManager: envType,
+          condaEnvName: envType === "conda" ? condaEnvName.trim() : "",
+          autoCheck: autoDetect,
+        },
+      };
+    }
 
-    const newEnv: RuntimeEnvironmentSummary = {
-      id: `env-${Date.now()}`,
-      name: envName,
-      status: autoDetect ? "检测中" : "未检测",
-      tone: autoDetect ? "info" : "neutral",
-      environmentSource:
-        mode === "system" ? "创建系统环境" : mode === "import" ? "导入本地环境" : "自定义环境",
-      purpose: envPurpose,
-      python: `Python ${pythonVersion}`,
-      framework: mode === "system" ? "PyTorch 2.4 / Ultralytics" : "待检测",
-      cuda: "待检测",
-      updatedAt: `今天 ${time}`,
+    return {
+      kind: "create",
+      payload: {
+        mode,
+        name: envName.trim(),
+        purpose: envPurpose,
+        template: mode === "system" ? "llm_inference.llm" : dependencyFile.trim() || envManager,
+        python: pythonVersion.trim(),
+        cuda: "CUDA 12.1",
+        savePath: envPath.trim(),
+        autoCheck: autoDetect,
+        environmentManager: mode === "custom" ? envManager : undefined,
+        packageSource: mode === "custom" ? packageSource.trim() : undefined,
+        projectDir: mode === "custom" ? projectDir.trim() : undefined,
+        dependencyFile: mode === "custom" ? dependencyFile.trim() : undefined,
+        category: mode === "system" ? "llm_inference" : undefined,
+        taskType: mode === "system" ? "llm" : undefined,
+        idempotencyKey: `env-create-${mode}-${Date.now()}`,
+      },
     };
+  };
 
-    onCreated(newEnv);
-    setShowConfirm(false);
-    setShowSuccess(true);
-    setTimeout(() => {
+  // 成功页 1.2 秒后自动关闭，组件卸载时清理定时器避免闪退
+  useEffect(() => {
+    if (!showSuccess) return;
+    const timer = setTimeout(() => {
       onClose();
-    }, 1800);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [showSuccess, onClose]);
+
+  const handleConfirm = async () => {
+    if (isSubmitting) return; // 防止重复提交
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      await onCreate(buildCreatePayload());
+      setShowConfirm(false);
+      setShowSuccess(true);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "环境创建失败");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleBackFromConfirm = () => {
+    setSubmitError(null);
     setShowConfirm(false);
+  };
+
+  const handleOverlayClose = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget && !isSubmitting) {
+      onClose();
+    }
+  };
+
+  const handleConfirmOverlayClose = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget && !isSubmitting) {
+      handleBackFromConfirm();
+    }
   };
 
   // ---- file/folder picker refs ----
@@ -426,34 +577,118 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
   const dependencyFileInputRef = useRef<HTMLInputElement>(null);
   const projectDirInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFolderPick = (
+  const handleFolderPick = async (
     ref: React.RefObject<HTMLInputElement | null>,
     setter: (v: string) => void,
   ) => {
-    ref.current?.click();
+    try {
+      if (window.ysyDesktop?.selectDirectory) {
+        const selectedPath = await window.ysyDesktop.selectDirectory("选择环境目录");
+        if (selectedPath) {
+          const normalizedPath = normalizeLocalPath(selectedPath);
+          if (!isAbsoluteLocalPath(normalizedPath)) {
+            throw new Error("系统选择器未返回绝对目录路径");
+          }
+          setter(normalizedPath);
+          setSubmitError(null);
+        }
+        return;
+      }
+      if (window.ysyDesktop?.getFilePath) {
+        ref.current?.click();
+        return;
+      }
+      setSubmitError("当前浏览器无法读取目录绝对路径，请手动输入绝对路径或使用桌面端选择目录");
+    } catch (error) {
+      console.error("[env-create] 目录选择失败:", error);
+      setSubmitError(error instanceof Error ? error.message : "目录选择失败");
+    }
   };
 
-  const handleFilePick = (
+  const handleFilePick = async (
     ref: React.RefObject<HTMLInputElement | null>,
     setter: (v: string) => void,
   ) => {
-    ref.current?.click();
+    try {
+      if (window.ysyDesktop?.selectFile) {
+        const selectedPath = await window.ysyDesktop.selectFile("选择环境文件");
+        if (selectedPath) {
+          const normalizedPath = normalizeLocalPath(selectedPath);
+          if (!isAbsoluteLocalPath(normalizedPath)) {
+            throw new Error("系统选择器未返回绝对文件路径");
+          }
+          setter(normalizedPath);
+          setSubmitError(null);
+        }
+        return;
+      }
+      if (window.ysyDesktop?.getFilePath) {
+        ref.current?.click();
+        return;
+      }
+      setSubmitError("当前浏览器无法读取文件绝对路径，请手动输入绝对路径或使用桌面端选择文件");
+    } catch (error) {
+      console.error("[env-create] 文件选择失败:", error);
+      setSubmitError(error instanceof Error ? error.message : "文件选择失败");
+    }
   };
 
   const makeFolderChangeHandler = (setter: (v: string) => void) =>
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      const electronPath = file ? (file as File & { path?: string }).path : "";
-      const path = electronPath || (file ? file.webkitRelativePath.split("/")[0] : "");
-      if (path) setter(path);
+      if (!file) {
+        event.target.value = "";
+        return;
+      }
+      // Electron: 通过 webUtils.getPathForFile 获取绝对路径
+      const electronPath: string = window.ysyDesktop?.getFilePath?.(file) || "";
+      const relativePath: string = file.webkitRelativePath || "";
+      const normalizedFilePath = electronPath.replace(/\\/g, "/");
+
+      if (normalizedFilePath && relativePath && normalizedFilePath.endsWith(relativePath)) {
+        // Electron 下完整路径 = electronPath - webkitRelativePath
+        const dirPath = normalizedFilePath.slice(0, -relativePath.length).replace(/\/$/, "");
+        if (isAbsoluteLocalPath(dirPath)) {
+          setter(dirPath);
+          setSubmitError(null);
+        }
+      } else if (isAbsoluteLocalPath(normalizedFilePath)) {
+        // Electron 降级：直接使用 getFilePath 返回的路径
+        setter(normalizedFilePath);
+        setSubmitError(null);
+      } else {
+        setSubmitError("无法获取目录绝对路径，请手动输入绝对路径或使用桌面端重新选择");
+      }
+      event.target.value = "";
     };
 
   const makeFileChangeHandler = (setter: (v: string) => void) =>
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      const electronPath = file ? (file as File & { path?: string }).path : "";
-      const path = electronPath || file?.name || "";
-      if (path) setter(path);
+      if (!file) {
+        event.target.value = "";
+        return;
+      }
+      // Electron: 通过 webUtils.getPathForFile 获取绝对路径
+      const electronPath: string = window.ysyDesktop?.getFilePath?.(file) || "";
+      const normalizedElectronPath = normalizeLocalPath(electronPath);
+      if (isAbsoluteLocalPath(normalizedElectronPath)) {
+        setter(normalizedElectronPath);
+        setSubmitError(null);
+        event.target.value = "";
+        return;
+      }
+      // Electron 旧版 API 降级: File.path 属性
+      const legacyPath: string = (file as File & { path?: string }).path || "";
+      const normalizedLegacyPath = normalizeLocalPath(legacyPath);
+      if (isAbsoluteLocalPath(normalizedLegacyPath)) {
+        setter(normalizedLegacyPath);
+        setSubmitError(null);
+        event.target.value = "";
+        return;
+      }
+      setSubmitError("无法获取文件绝对路径，请手动输入绝对路径或使用桌面端重新选择");
+      event.target.value = "";
     };
 
   const toggleTemplate = (item: string) => {
@@ -485,7 +720,7 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
 
   if (showSuccess) {
     return (
-      <div className="env-create-overlay" onClick={onClose}>
+      <div className="env-create-overlay" onClick={handleOverlayClose}>
         <section
           aria-modal="true"
           className="env-create-dialog env-create-dialog--success"
@@ -494,8 +729,8 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
         >
           <div className="env-create-success">
             <CheckCircle2 size={48} className="env-create-success__icon" />
-            <h3>{envName} 已加入环境列表</h3>
-            <p>正在进入检测流程…</p>
+            <h3>{mode === "system" ? "系统环境创建任务已提交" : `${envName} 创建任务已提交`}</h3>
+            <p>后台会继续创建环境并更新状态。</p>
           </div>
         </section>
       </div>
@@ -504,7 +739,7 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
 
   if (showConfirm) {
     return (
-      <div className="env-create-overlay" onClick={handleBackFromConfirm}>
+      <div className="env-create-overlay" onClick={handleConfirmOverlayClose}>
         <section
           aria-modal="true"
           className="env-create-dialog env-create-dialog--confirm"
@@ -513,7 +748,7 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
         >
           <header className="env-create-dialog__header">
             <h2 id="env-create-title">确认创建环境</h2>
-            <button className="env-create-dialog__close" onClick={handleBackFromConfirm} title="返回" type="button">
+            <button className="env-create-dialog__close" disabled={isSubmitting} onClick={handleBackFromConfirm} title="返回" type="button">
               <X size={18} />
             </button>
           </header>
@@ -543,16 +778,21 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
             <p className="confirm-dialog__risk">
               <strong>AI 风险提示：</strong>请确认目标、资源占用和上下文后再继续。
             </p>
+            {submitError ? (
+              <p className="confirm-dialog__risk confirm-dialog__risk--danger">
+                {submitError}
+              </p>
+            ) : null}
           </div>
 
           <footer className="env-create-dialog__footer">
             <div />
             <div className="env-create-dialog__actions">
-              <button className="settings-action-button" onClick={handleBackFromConfirm} type="button">
+              <button className="settings-action-button" disabled={isSubmitting} onClick={handleBackFromConfirm} type="button">
                 返回修改
               </button>
-              <button className="settings-action-button settings-action-button--primary" onClick={handleConfirm} type="button">
-                确认创建环境
+              <button className="settings-action-button settings-action-button--primary" disabled={isSubmitting} onClick={handleConfirm} type="button">
+                {isSubmitting ? "提交中..." : mode === "import" ? "确认导入环境" : "确认创建环境"}
               </button>
             </div>
           </footer>
@@ -562,7 +802,7 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
   }
 
   return (
-    <div className="env-create-overlay" onClick={onClose}>
+    <div className="env-create-overlay" onClick={handleOverlayClose}>
       <section
         aria-labelledby="env-create-title"
         aria-modal="true"
@@ -598,6 +838,9 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
               onToggleTemplateGroup={toggleTemplateGroup}
             />
           ) : null}
+          {submitError ? (
+            <p className="env-create-template-notice" role="alert">{submitError}</p>
+          ) : null}
           {mode === "import" ? (
             <ImportEnvironmentPane
               envName={envName}
@@ -615,7 +858,9 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
               envPathInputRef={envPathInputRef}
               interpreterPathInputRef={interpreterPathInputRef}
               onFolderPick={handleFolderPick}
+              onFilePick={handleFilePick}
               onFolderChange={makeFolderChangeHandler}
+              onFileChange={makeFileChangeHandler}
             />
           ) : null}
           {mode === "custom" ? (
@@ -660,10 +905,10 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
             </span>
           </label>
           <div className="env-create-dialog__actions">
-            <button className="settings-action-button" onClick={onClose} type="button">
+            <button className="settings-action-button" disabled={isSubmitting} onClick={onClose} type="button">
               取消
             </button>
-            <button className="settings-action-button settings-action-button--primary" onClick={handleAction} type="button">
+            <button className="settings-action-button settings-action-button--primary" disabled={isSubmitting} onClick={handleAction} type="button">
               {actionLabel}
             </button>
           </div>
@@ -672,7 +917,7 @@ function CreateEnvironmentDialog({ onClose, onCreated }: CreateEnvironmentDialog
 
       {/* hidden file inputs for path selection */}
       <HiddenFolderInput ref={envPathInputRef} onChange={makeFolderChangeHandler(setEnvPath)} />
-      <HiddenFolderInput ref={interpreterPathInputRef} onChange={makeFolderChangeHandler(setPythonInterpreterPath)} />
+      <HiddenFileInput ref={interpreterPathInputRef} onChange={makeFileChangeHandler(setPythonInterpreterPath)} />
       <HiddenFileInput ref={dependencyFileInputRef} onChange={makeFileChangeHandler(setDependencyFile)} />
       <HiddenFolderInput ref={projectDirInputRef} onChange={makeFolderChangeHandler(setProjectDir)} />
     </div>
@@ -685,6 +930,7 @@ const HiddenFolderInput = forwardRef<HTMLInputElement, { onChange: (e: React.Cha
     <input
       ref={ref}
       className="profile-folder-input"
+      onClick={(event) => event.stopPropagation()}
       onChange={onChange}
       type="file"
       // @ts-expect-error webkitdirectory is supported by Chromium/Electron.
@@ -699,6 +945,7 @@ const HiddenFileInput = forwardRef<HTMLInputElement, { onChange: (e: React.Chang
     <input
       ref={ref}
       className="profile-folder-input"
+      onClick={(event) => event.stopPropagation()}
       onChange={onChange}
       type="file"
     />
@@ -719,33 +966,23 @@ function SystemEnvironmentPane({
   return (
     <div className="env-create-pane">
       <p className="env-create-description">
-        系统环境会基于预置模板创建，适合 PyTorch、YOLO、大模型推理等标准任务。
+        选择预置模板后创建环境。环境名称和 Conda 环境名称将由系统自动生成。
       </p>
       <div className="env-template-grid" aria-label="系统环境模板">
-        <TemplateGroup
-          groupKey="dl"
-          title="深度学习"
-          items={["目标检测", "图像分类", "语义检测"]}
-          selectedTemplates={selectedTemplates}
-          onToggle={onToggleTemplate}
-          onToggleGroup={onToggleTemplateGroup}
-        />
-        <TemplateGroup
-          groupKey="llm-train"
-          title="大模型训练"
-          items={["LLM", "Embedding", "Rerank"]}
-          selectedTemplates={selectedTemplates}
-          onToggle={onToggleTemplate}
-          onToggleGroup={onToggleTemplateGroup}
-        />
-        <TemplateGroup
-          groupKey="llm-infer"
-          title="大模型推理"
-          items={["LLM", "Embedding", "Rerank"]}
-          selectedTemplates={selectedTemplates}
-          onToggle={onToggleTemplate}
-          onToggleGroup={onToggleTemplateGroup}
-        />
+        {SYSTEM_TEMPLATE_GROUPS.map((group) => {
+          const itemKeys = group.items.map((item) => `${group.key}:${item}`);
+          return (
+            <TemplateGroup
+              groupKey={group.key}
+              items={[...group.items]}
+              key={group.key}
+              selectedTemplates={selectedTemplates}
+              title={group.title}
+              onToggle={onToggleTemplate}
+              onToggleGroup={() => onToggleTemplateGroup(itemKeys)}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -823,7 +1060,9 @@ interface ImportEnvironmentPaneProps {
   envPathInputRef: React.RefObject<HTMLInputElement | null>;
   interpreterPathInputRef: React.RefObject<HTMLInputElement | null>;
   onFolderPick: (ref: React.RefObject<HTMLInputElement | null>, setter: (v: string) => void) => void;
+  onFilePick: (ref: React.RefObject<HTMLInputElement | null>, setter: (v: string) => void) => void;
   onFolderChange: (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onFileChange: (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 function ImportEnvironmentPane({
@@ -834,7 +1073,7 @@ function ImportEnvironmentPane({
   pythonInterpreterPath, onPythonInterpreterPathChange,
   condaEnvName, onCondaEnvNameChange,
   envPathInputRef, interpreterPathInputRef,
-  onFolderPick, onFolderChange,
+  onFolderPick, onFilePick,
 }: ImportEnvironmentPaneProps) {
   return (
     <div className="env-create-pane">
@@ -846,7 +1085,7 @@ function ImportEnvironmentPane({
         <EnvSelectField label="环境用途" value={envPurpose} onChange={onEnvPurposeChange} options={ENV_PURPOSE_OPTIONS} />
         <EnvSelectField label="环境类型" value={envType} onChange={onEnvTypeChange} options={ENV_TYPE_OPTIONS} />
         <EnvPathField label="本地环境路径" value={envPath} onChange={onEnvPathChange} onBrowse={() => onFolderPick(envPathInputRef, onEnvPathChange)} />
-        <EnvPathField label="Python 解释器路径" value={pythonInterpreterPath} onChange={onPythonInterpreterPathChange} onBrowse={() => onFolderPick(interpreterPathInputRef, onPythonInterpreterPathChange)} />
+        <EnvPathField label="Python 解释器路径" value={pythonInterpreterPath} onChange={onPythonInterpreterPathChange} onBrowse={() => onFilePick(interpreterPathInputRef, onPythonInterpreterPathChange)} />
         <EnvFormField label="Conda 环境名" value={condaEnvName} onChange={onCondaEnvNameChange} />
       </div>
     </div>
@@ -962,77 +1201,114 @@ function EnvPathField({
   onBrowse: () => void;
 }) {
   return (
-    <label className="env-create-field">
+    <div className="env-create-field">
       <span>{label}</span>
       <div className="env-create-path-control">
-        <input onChange={(e) => onChange(e.target.value)} title={value} value={value} />
+        <input aria-label={label} onChange={(e) => onChange(e.target.value)} title={value} value={value} />
         <button onClick={onBrowse} title="选择路径" type="button">
           <FolderOpen size={15} />
         </button>
       </div>
-    </label>
+    </div>
   );
 }
 
 function EnvironmentSettings({
   environments,
+  isLoading,
+  checkingEnvironmentIds,
   onDelete,
   onDetect,
 }: {
-  environments: typeof runtimeEnvironments;
+  environments: RuntimeEnvironmentSummary[];
+  isLoading: boolean;
+  checkingEnvironmentIds: Set<string>;
   onDelete: (environment: RuntimeEnvironmentSummary) => void;
-  onDetect: (name: string) => void;
+  onDetect: (environment: RuntimeEnvironmentSummary) => void;
 }) {
+  if (isLoading) {
+    return (
+      <div className="settings-empty">
+        <p>正在加载运行环境...</p>
+      </div>
+    );
+  }
+
+  if (environments.length === 0) {
+    return (
+      <div className="settings-empty">
+        <p>暂无运行环境，请创建或导入环境。</p>
+      </div>
+    );
+  }
+
   return (
     <div className="environment-list" aria-label="运行环境列表">
-      {environments.map((env) => (
-        <article
-          className="environment-card"
-          key={env.id}
-        >
-          <div className="environment-card__icon" aria-hidden="true">
-            <span />
-          </div>
-          <div className="environment-card__body">
-            <div className="environment-card__heading">
-              <h2>{env.name}</h2>
-              <StatusBadge label={env.status} tone={env.tone} />
+      {environments.map((env) => {
+        const isChecking = checkingEnvironmentIds.has(env.id);
+        return (
+          <article
+            className="environment-card"
+            key={env.id}
+          >
+            <div className="environment-card__icon" aria-hidden="true">
+              <span />
             </div>
-            <p>{env.purpose}</p>
-            <div className="environment-card__meta">
-              <span>{env.python}</span>
-              <span>{env.framework}</span>
-              <span>{env.cuda}</span>
+            <div className="environment-card__body">
+              <div className="environment-card__heading">
+                <h2>{env.name}</h2>
+                <StatusBadge label={env.status} tone={env.tone} />
+              </div>
+              <div className="environment-card__identity">
+                <p>{env.purpose}</p>
+              </div>
+              <div className="environment-card__runtime" aria-label={`${env.name} 运行配置`}>
+                <div>
+                  <strong title={env.python}>{env.python}</strong>
+                </div>
+                <div>
+                  <strong title={env.framework}>{env.framework}</strong>
+                </div>
+                <div>
+                  <strong title={env.cuda}>{env.cuda}</strong>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="environment-card__side">
-            <time>{env.updatedAt}</time>
-            <div className="environment-card__actions">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDetect(env.name);
-                }}
-              >
-                <RotateCw size={13} />
-                检测环境
-              </button>
-              <button
-                className="environment-card__danger"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(env);
-                }}
-              >
-                <Trash2 size={13} />
-                删除
-              </button>
+            <div className="environment-card__side">
+              <time>{env.updatedAt}</time>
+              <div className="environment-card__actions">
+                <button
+                  aria-label={isChecking ? "环境检测中" : `检测 ${env.name}`}
+                  className="environment-card__icon-action"
+                  title={isChecking ? "环境检测中" : "检测环境"}
+                  type="button"
+                  disabled={isChecking}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDetect(env);
+                  }}
+                >
+                  <RotateCw size={13} />
+                  {isChecking ? "检测中" : "检测环境"}
+                </button>
+                <button
+                  aria-label={`删除 ${env.name}`}
+                  className="environment-card__icon-action environment-card__danger"
+                  title="删除环境"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(env);
+                  }}
+                >
+                  <Trash2 size={13} />
+                  删除
+                </button>
+              </div>
             </div>
-          </div>
-        </article>
-      ))}
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -1700,7 +1976,11 @@ function EnvironmentDeleteDialog({
               <span className="confirm-delete-option__radio" aria-hidden="true" />
               <span>
                 <strong>删除本地以及数据库环境</strong>
-                <small>删除本地环境目录，同时移除环境记录和业务引用。确认时会再次提醒。</small>
+                <small>
+                  {environment.canDeleteLocalFiles
+                    ? (environment.deleteLocalFilesReason || "会同时删除本地环境目录和数据库登记记录；确认时会再次提醒。")
+                    : (environment.deleteLocalFilesReason || "当前环境可能不支持删除本地文件，后端将进行最终校验；确认时会再次提醒。")}
+                </small>
               </span>
             </button>
           </div>

@@ -6,20 +6,20 @@
 
 项目负责人 / 架构负责人负责：
 
-- 维护 `openspec/global/global.spec.md`。
+- 维护 `openspec/frontend/global/global.spec.md`。
 - 审核一级模块、核心数据模型、状态机、AI 动作边界和高风险确认机制。
 - 决定是否把多个 OpenSpec Change 中重复出现的规则收敛到 Global Spec 或 Module Spec。
 - 审核 AGENTS.md 中会影响 AI Coding 行为的规则。
 
 模块负责人负责：
 
-- 维护对应 `openspec/modules/*.spec.md`。
+- 维护对应 `openspec/frontend/modules/*.spec.md`。
 - 审核模块内 API、状态、表单、页面、任务执行和 AI 上下文规则。
 - 确保模块实现不绕过 Global Spec。
 
 开发人员负责：
 
-- 为每个需求创建或更新 `openspec/changes/<change-id>/`。
+- 为每个需求创建或更新 `openspec/frontend/changes/<change-id>/`（前端需求）或 `openspec/changes/<change-id>/`（跨模块变更）。
 - 保持代码、测试、文档和 Change 同步。
 - 在 PR 中说明是否影响 Global Spec 或 Module Spec。
 - 发现 Spec 与实现不一致时先提出修正，不让差异继续扩大。
@@ -29,6 +29,7 @@
 普通需求只能修改：
 
 ```text
+openspec/frontend/changes/<change-id>/
 openspec/changes/<change-id>/
 frontend/
 backend/
@@ -41,8 +42,8 @@ docs/
 以下内容需要负责人确认：
 
 ```text
-openspec/global/
-openspec/modules/
+openspec/frontend/global/
+openspec/frontend/modules/
 AGENTS.md
 ```
 

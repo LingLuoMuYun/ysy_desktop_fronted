@@ -16,9 +16,11 @@ AI 助手不能绕过后端直接改变稳定业务状态。
 ## API 设计原则
 
 - API 返回结构必须稳定。
-- 错误响应必须包含可用于 UI 和 AI 诊断的 `errorCode` 与 `errorMessage`。
+- 业务 API 响应必须使用统一包裹：`success`、`data`、`error`、`requestId`。
+- 错误响应必须包含可用于 UI 和 AI 诊断的稳定错误码、错误说明和下一步建议。
 - 本地路径、进程 ID、端口、日志引用等字段必须明确语义。
 - 高风险动作 API 必须能表达“待确认”和“已确认”两个阶段。
+- 可能重复提交的创建、启动、停止、安装等接口必须支持 `Idempotency-Key` 或等价幂等键。
 - 数据库未定前，业务代码应通过 repository / storage 抽象隔离具体数据库。
 
 ## 核心实体
@@ -89,6 +91,17 @@ Task 只允许一个主状态。环境检查、数据检查、模型检查、资
 - 检测 Python、包管理器、框架、CUDA、驱动、磁盘、内存。
 - 导入本地环境时不要求用户手填框架和 CUDA 版本。
 - 依赖安装和修复必须记录日志，并按高风险操作确认。
+
+环境管理 API：
+
+- 运行环境业务后端默认入口为 `http://10.0.1.5:8000`，与 AI / chat runtime 后端分离。
+- `GET /api/environments` 返回设置页卡片列表字段，包括状态文案、Python 版本、依赖摘要、CUDA / 检测状态、更新时间和本地删除策略。
+- `POST /api/environments` 统一创建系统环境和自定义环境，必须传 `confirmed=true` 和 `Idempotency-Key`。
+- `mode=system` 当前仅支持 `category=llm_inference`、`taskType=llm`，环境名称、Conda 环境名和保存路径由后端生成。
+- `mode=custom` 必须接收 `name`、`purpose`、`python`、`packageManager`、`savePath`，可接收 `packageSource`、`dependencyFilePath` 和结构化 `packages`。
+- 创建环境接口只返回环境摘要和后台创建任务摘要，不等待依赖安装完成。
+- `POST /api/environments/import` 只登记本地已有环境的目录、解释器和管理器，不复制、不创建、不修改用户已有 Python 环境。
+- `DELETE /api/environments/{envId}` 必须接收 `confirmed`、`deleteLocalFiles` 和可选 `deleteLocalFilesConfirmed`，并由后端重新校验是否允许删除本地 Conda 环境。
 
 ## 推理服务规则
 

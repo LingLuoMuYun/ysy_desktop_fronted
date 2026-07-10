@@ -186,7 +186,9 @@ export async function sendMessage(
           onReasoning(event.content);
         } else if (event.type === "done") {
           if (event.ok) {
-            fullReply = event.reply || fullReply;
+            // 防御：如果 done.reply 和已流式累加的内容相同，不做替换
+            // 避免后端在 delta 和 done 中重复返回相同完整文本导致的潜在问题
+            fullReply = event.reply && event.reply !== fullReply ? event.reply : fullReply;
             finalResult = {
               reply: fullReply,
               conversationId: event.conversation_id,

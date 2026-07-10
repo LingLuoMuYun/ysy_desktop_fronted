@@ -61,6 +61,8 @@ export interface RuntimeEnvironmentSummary {
   framework: string;
   cuda: string;
   updatedAt: string;
+  canDeleteLocalFiles?: boolean;
+  deleteLocalFilesReason?: string;
 }
 
 /** 环境检测单项结果 */

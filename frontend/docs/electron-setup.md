@@ -45,4 +45,19 @@ ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ pnpm rebuild electron
 
 ## Packaging
 
-The reference project uses `electron-builder`, but this project does not add a packaging dependency yet. Add packaging in a separate change when installer artifacts are required.
+This project uses `electron-builder` for packaging. See [windows安装指南.md](../windows安装指南.md) for complete Windows packaging and installation instructions.
+
+Quick packaging commands:
+
+```bash
+# Windows (NSIS installer + portable)
+pnpm run electron:package:win
+
+# macOS (DMG)
+pnpm run electron:package:mac
+
+# Linux (AppImage)
+pnpm run electron:package:linux
+```
+
+Build output goes to `frontend/release/`. The NSIS installer (`桌面智算 Setup x.x.x.exe`) supports custom install paths, desktop shortcuts, and start menu entries. See the [Windows installation guide](../windows安装指南.md) for end-user instructions and SmartScreen handling.

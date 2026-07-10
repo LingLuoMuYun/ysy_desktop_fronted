@@ -8,4 +8,4 @@
 - [x] 更新 README PRD 入口。
 - [x] 更新 AGENTS 必读文档路径。
 - [x] 运行文档验证。
-- [ ] git commit。
+- [x] git commit。

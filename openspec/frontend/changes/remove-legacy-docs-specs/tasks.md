@@ -8,4 +8,4 @@
 - [x] 更新开发规范中的 `docs/specs` 引用。
 - [x] 更新相关 OpenSpec Change 中的历史说明。
 - [x] 运行验证。
-- [ ] git commit。
+- [x] git commit。

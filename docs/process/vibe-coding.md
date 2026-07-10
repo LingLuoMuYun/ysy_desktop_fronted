@@ -45,12 +45,12 @@ AI 不应直接做：
 推荐分支：
 
 - `main`：稳定主分支
-- `develop`：集成分支
+- `dev`（或 `develop`）：集成分支
 - `feature/<change-id>`：功能分支
 - `fix/<change-id>`：问题修复分支
 - `docs/<change-id>`：文档分支
 
-`change-id` 与 `openspec/changes/<change-id>/` 保持一致。
+`change-id` 与 `openspec/frontend/changes/<change-id>/` 或 `openspec/changes/<change-id>/` 保持一致。
 
 示例：
 

@@ -9,7 +9,7 @@ React + Electron 桌面端代码目录。
 - 调用后端受控 API，不直接执行本机高风险动作。
 - 承载首页、项目、任务、数据、模型、设置和 AI 助手界面。
 
-默认后端地址为 `http://10.0.1.5:8765`。服务层位于 `src/services/`，当前已接入 AI 助手模型配置、运行时模型切换、聊天流和会话接口。
+默认 AI 助手 / chat runtime 地址为 `http://10.0.1.5:8765`，默认运行环境业务后端地址为 `http://10.0.1.5:8000`。服务层位于 `src/services/`，当前已接入运行环境列表、创建、导入、删除，AI 助手模型配置、运行时模型切换、聊天流和会话接口。
 
 ## 快速开始
 
@@ -25,6 +25,7 @@ pnpm run typecheck         # TypeScript 类型检查
 
 ```bash
 VITE_API_BASE_URL=http://127.0.0.1:8765 pnpm run electron:dev
+VITE_ENVIRONMENTS_API_BASE_URL=http://127.0.0.1:8000 pnpm run electron:dev
 ```
 
 | 命令 | 说明 | 端口 |
@@ -92,6 +93,7 @@ frontend/
     features/                 # 业务 Feature（按领域划分，规划中）
     hooks/                    # 共享 Hooks（规划中）
     services/                 # API / IPC 服务层
+      environmentsApi.ts      # 运行环境列表、创建、导入、删除接口
       assistantModelsApi.ts   # AI 助手模型配置 CRUD、默认模型、连接测试
       chatApi.ts              # 聊天流、运行时模型切换、会话接口
     stores/                   # 全局状态 Store（规划中）
@@ -124,10 +126,14 @@ frontend/
 设置页包含三大 Tab：环境、AI 助手、个人信息。
 
 **环境 Tab**：
-- 环境卡片列表，支持按名称/用途搜索过滤
-- 点击卡片进入详情页：Python/CUDA/框架版本、逐项检测结果、使用建议
-- 创建环境弹窗（系统解释器 / 导入已有 / 自定义）
-- 检测环境：页面顶部 toast 提示检测结果（后续对接后端）
+- 环境卡片列表来自环境业务后端 `GET /api/environments`
+- 创建环境弹窗支持系统环境、导入本地环境、自定义环境
+- 系统环境创建当前按后端契约只支持“大模型推理 / LLM”，提交 `mode=system`、`category=llm_inference`、`taskType=llm`
+- 自定义环境创建提交 `mode=custom`、`packageManager`、`savePath`、`dependencyFilePath`、`confirmed=true`
+- 创建环境请求会带 `Idempotency-Key`，后端返回环境摘要和后台创建任务摘要
+- 导入本地环境只登记路径和解释器信息，不复制或修改已有环境
+- 删除环境会传 `confirmed=true`，并根据后端返回的 `canDeleteLocalFiles` 控制是否允许删除本地 Conda 环境
+- 检测环境入口保留；当前运行中的 `8000` OpenAPI 暂未暴露 `/api/environments/{envId}/check` 时会提示后端暂未开放
 
 **AI 助手 Tab**：
 - 模型卡片列表，支持按名称/厂商搜索过滤
@@ -186,13 +192,19 @@ frontend/
 
 | 项 | 默认值 |
 |----|--------|
-| API Base | `http://10.0.1.5:8765` |
-| 覆盖变量 | `VITE_API_BASE_URL` |
+| AI / chat API Base | `http://10.0.1.5:8765` |
+| 环境业务 API Base | `http://10.0.1.5:8000` |
+| 通用覆盖变量 | `VITE_API_BASE_URL` |
+| 环境覆盖变量 | `VITE_ENVIRONMENTS_API_BASE_URL` |
+| 环境列表 | `GET /api/environments` |
+| 创建环境 | `POST /api/environments` + `Idempotency-Key` |
+| 导入本地环境 | `POST /api/environments/import` |
+| 删除环境 | `DELETE /api/environments/{envId}` |
 | 模型列表 | `GET /api/settings/assistant/models` |
 | 运行时模型切换 | `POST /api/runtime/model` |
 | 聊天流 | `POST /api/chat/stream` |
 
-开发环境请求会优先访问 `API Base`。如果浏览器或 Electron 渲染进程因 CORS / 网络策略无法直连，会回退到同源 `/api/...`，由 Vite proxy 转发到后端。
+开发环境请求会优先访问对应 `API Base`。如果浏览器或 Electron 渲染进程因 CORS / 网络策略无法直连，会回退到同源 `/api/...`，由 Vite proxy 转发到后端。`/api/environments` 和 `/api/health` 代理到 `8000`，其他 `/api` 默认代理到 `8765`。
 
 ## 打包安装包
 

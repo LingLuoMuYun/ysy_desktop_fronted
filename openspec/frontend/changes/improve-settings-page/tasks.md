@@ -40,6 +40,17 @@
 - [x] 环境卡片悬浮交互：hover 时显示蓝色高亮边框 + 浅蓝背景 + 阴影，右侧浮现"检测环境"和"删除"按钮（stopPropagation 阻止冒泡）。
 - [x] TypeScript 类型检查通过 (`pnpm run typecheck`)。
 - [x] Vite 构建通过 (`pnpm run build`)。
+- [x] 新增 `frontend/src/services/environmentsApi.ts`，对接环境业务后端 `http://10.0.1.5:8000`。
+- [x] 环境列表改为调用 `GET /api/environments`，并映射 `statusText`、`pythonVersion`、`dependencySummary`、`canDeleteLocalFiles` 等字段。
+- [x] 创建系统环境按新版契约提交 `mode=system`、`category=llm_inference`、`taskType=llm`、`confirmed=true`，并发送 `Idempotency-Key`。
+- [x] 创建自定义环境按新版契约提交 `mode=custom`、`packageManager`、`savePath`、`dependencyFilePath`、`packages=[]`、`confirmed=true`，并把 `conda+pip` 映射为 `conda_pip`。
+- [x] 创建成功文案调整为“后台创建任务已提交”，避免暗示依赖安装已经完成。
+- [x] 导入本地环境接入 `POST /api/environments/import`，提交 `environmentPath`、`pythonPath`、`environmentManager`、`condaEnvName`、`autoCheck`。
+- [x] 删除环境接入 `DELETE /api/environments/{envId}`，提交 `confirmed`、`deleteLocalFiles`、`deleteLocalFilesConfirmed`。
+- [x] 删除本地环境选项根据 `canDeleteLocalFiles` 启用或禁用。
+- [x] Vite proxy 拆分：`/api/environments` 和 `/api/health` 转发到 `8000`，其他 `/api` 转发到 `8765`。
+- [x] 系统环境创建 UI 收敛为当前后端支持的“大模型推理 / LLM”。
+- [x] 当前运行后端未暴露 `/api/environments/{envId}/check` 时，检测环境入口提示不可用。
 
 ## 待后续 Change 处理
 
@@ -51,3 +62,4 @@
 - [ ] 高风险操作接入 ConfirmPlaceholder 组件
 - [ ] ProfileSettings 表单 isDirty / isSaving / saveError 状态
 - [ ] API Key 真实脱敏逻辑（当前为 mock 展示）
+- [ ] 环境检测接口在后端运行实例暴露后，接入 `POST /api/environments/{envId}/check` 并展示 `CheckResult`。
