@@ -57,6 +57,7 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
   const [activeHomeConversationId, setActiveHomeConversationId] = useState(() => "");
   const [homeConversationTitle, setHomeConversationTitle] = useState("");
   const [rightPanelWidth, setRightPanelWidth] = useState(DEFAULT_RIGHT_PANEL_WIDTH);
+  const [pageRefreshNonce, setPageRefreshNonce] = useState(0);
   const isHome = activeRoute === "home";
   const activeHomeConversation = homeConversations.find((conversation) => conversation.id === activeHomeConversationId)
     ?? homeConversations[0]
@@ -136,6 +137,10 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
     setActiveHomeConversationId(conversationId);
   }, []);
 
+  const handleRefreshPage = useCallback(() => {
+    setPageRefreshNonce((nonce) => nonce + 1);
+  }, []);
+
   return (
     <div className="desktop-stage">
       <div
@@ -162,6 +167,7 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
             moduleLabel={moduleLabel}
             resourceOverviewOpen={resourceOverviewOpen}
             showResourceControls={isHome}
+            onRefreshPage={handleRefreshPage}
             onToggleAssistant={() => setAssistantOpen((isOpen) => !isOpen)}
             onToggleConversationHistory={() => setConversationHistoryOpen((isOpen) => !isOpen)}
             onNewConversation={handleNewConversation}
@@ -176,7 +182,7 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
             />
           ) : null}
           <div className="app-surface">
-            <main className={`workspace workspace--${activeRoute}`}>
+            <main className={`workspace workspace--${activeRoute}`} key={`${activeRoute}-${pageRefreshNonce}`}>
               {isHome && isValidElement(children)
                 ? cloneElement(children as ReactElement<{
                     messages?: ConversationSummary["messages"];

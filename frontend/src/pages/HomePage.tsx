@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Link2, Lightbulb, RefreshCw, X } from "lucide-react";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { PromptToolbar, ProjectSelect, type SkillOption } from "../components/PromptToolbar";
+import { useAssistantPanel } from "../layouts/AssistantPanelContext";
 import { suggestionSets, type SuggestionItem } from "../mocks/prototypeData";
 import { chatApi } from "../services/chatApi";
 
@@ -54,6 +55,9 @@ export function HomePage({ messages = [], onConversationTitleChange, onMessagesC
   const [isStreaming, setIsStreaming] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastSyncedModelIdRef = useRef<string | null>(null);
+
+  const { currentModel, switchModel, refreshModels } = useAssistantPanel();
 
   const currentSuggestions = suggestionSets[currentSetIndex];
   const isChatting = messages.length > 0;
@@ -63,6 +67,22 @@ export function HomePage({ messages = [], onConversationTitleChange, onMessagesC
     if (!isChatting) return;
     messagesEndRef.current?.scrollIntoView({ block: "end" });
   }, [isChatting, latestMessage?.id, latestMessage?.text]);
+
+  // 进入首页时刷新模型列表，确保拿到 Settings 中最新设置的默认模型
+  useEffect(() => {
+    refreshModels().catch(() => {
+      // 刷新失败时继续使用上下文中已有的模型
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // refreshModels 完成后 currentModel 更新为最新的默认模型，此时同步到后端运行时
+  useEffect(() => {
+    if (!currentModel || currentModel.id === lastSyncedModelIdRef.current) return;
+    lastSyncedModelIdRef.current = currentModel.id;
+    switchModel(currentModel.id).catch(() => {
+      // 运行时模型切换失败不影响对话，后端会使用服务端默认值
+    });
+  }, [currentModel?.id, switchModel]);
 
   const handleSend = useCallback(async () => {
     const trimmed = inputValue.trim();

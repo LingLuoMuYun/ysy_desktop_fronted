@@ -1,6 +1,8 @@
 import { Activity, Bot, CheckCircle2, FolderOpen, Info, Pencil, Plus, RotateCw, Save, Star, Trash2, User, X, XCircle, Zap } from "lucide-react";
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { StatusBadge } from "../components/StatusBadge";
+import { Toast } from "../components/Toast";
+import { useAssistantPanel } from "../layouts/AssistantPanelContext";
 import { assistantModelDetails, assistantModels } from "../mocks/prototypeData";
 import { assistantModelsApi, type AssistantModelFormInput } from "../services/assistantModelsApi";
 import { environmentsApi, type EnvironmentCreateInput, type EnvironmentImportInput } from "../services/environmentsApi";
@@ -9,6 +11,7 @@ import type { AssistantModelDetail, RuntimeEnvironmentSummary } from "../types/d
 type SettingsTab = "environment" | "assistant" | "profile";
 type EnvironmentCreateMode = "system" | "import" | "custom";
 type EnvironmentDeleteScope = "database" | "local-and-database";
+const SETTINGS_ACTIVE_TAB_STORAGE_KEY = "ysy-desktop.settings.activeTab";
 
 const SYSTEM_TEMPLATE_GROUPS = [
   { key: "dl", title: "深度学习", items: ["目标检测", "图像分类", "语义检测"] },
@@ -33,6 +36,16 @@ const tabs: Array<{ key: SettingsTab; label: string }> = [
   { key: "profile", label: "个人信息" },
 ];
 
+function isSettingsTab(value: string | null): value is SettingsTab {
+  return value === "environment" || value === "assistant" || value === "profile";
+}
+
+function getInitialSettingsTab(): SettingsTab {
+  if (typeof window === "undefined") return "environment";
+  const storedTab = window.localStorage.getItem(SETTINGS_ACTIVE_TAB_STORAGE_KEY);
+  return isSettingsTab(storedTab) ? storedTab : "environment";
+}
+
 /** 对 API Key 做隐私保护：仅展示 sk- 前缀和末尾 5 个字符，中间用 •••• 替代 */
 function maskApiKey(key: string): string {
   if (!key || key.length <= 8) return key || "未配置";
@@ -43,7 +56,7 @@ function maskApiKey(key: string): string {
 }
 
 export function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("environment");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => getInitialSettingsTab());
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [envList, setEnvList] = useState<RuntimeEnvironmentSummary[]>([]);
   const [modelList, setModelList] = useState(assistantModels);
@@ -56,13 +69,12 @@ export function SettingsPage() {
   const [isEnvironmentLoading, setIsEnvironmentLoading] = useState(false);
   const [checkingEnvironmentIds, setCheckingEnvironmentIds] = useState<Set<string>>(new Set());
   const [isModelLoading, setIsModelLoading] = useState(false);
+  const { refreshModels, switchModel } = useAssistantPanel();
 
-  // 5 秒后自动消失
   useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 5000);
-    return () => clearTimeout(timer);
-  }, [toast]);
+    window.localStorage.setItem(SETTINGS_ACTIVE_TAB_STORAGE_KEY, activeTab);
+  }, [activeTab]);
+
 
   const setAssistantModels = (models: AssistantModelDetail[]) => {
     setModelList(
@@ -227,20 +239,11 @@ export function SettingsPage() {
 
       <div className="settings-content">
         {toast ? (
-          <div className={`settings-toast${toast.tone === "success" ? " settings-toast--success" : ""}`}>
-            <div className="settings-toast__content">
-              {toast.tone === "success" ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-              <span>{toast.message}</span>
-            </div>
-            <button
-              className="settings-toast__close"
-              onClick={() => setToast(null)}
-              type="button"
-              title="关闭"
-            >
-              <X size={14} />
-            </button>
-          </div>
+          <Toast
+            message={toast.message}
+            tone={toast.tone}
+            onClose={() => setToast(null)}
+          />
         ) : null}
 
         <div className="settings-main">
@@ -288,6 +291,9 @@ export function SettingsPage() {
                       ]),
                     ) as typeof assistantModelDetails,
                   );
+                  await refreshModels(defaultModel.id);
+                  await switchModel(defaultModel.id);
+                  setToast({ message: `${defaultModel.name} 已设为默认模型`, tone: "success" });
                 } catch (error) {
                   showError(error instanceof Error ? error.message : "设置默认模型失败");
                 }

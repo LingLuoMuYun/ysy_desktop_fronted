@@ -42,7 +42,7 @@ interface AssistantPanelContextValue {
   currentModel: AssistantModelDetail | null;
   /** 切换运行时模型 */
   switchModel: (modelConfigId: string) => Promise<void>;
-  refreshModels: () => Promise<void>;
+  refreshModels: (preferredModelId?: string) => Promise<void>;
   /** 工具栏辅助模式 */
   assistMode: AssistMode;
   setAssistMode: (mode: AssistMode) => void;
@@ -90,13 +90,23 @@ export function AssistantPanelProvider({
   const [assistMode, setAssistMode] = useState<AssistMode>("assist");
   const [selectedProject, setSelectedProject] = useState("none");
   const msgCounter = useRef(0);
-  const loadModels = useCallback(async () => {
+  const loadModels = useCallback(async (preferredModelId?: string) => {
     const models = await assistantModelsApi.list();
     setModelList(models);
     setCurrentModel((current) => {
+      if (preferredModelId) {
+        return models.find((model) => model.id === preferredModelId) ?? models.find((model) => model.isDefault) ?? models[0] ?? null;
+      }
       if (current) {
         const refreshedCurrent = models.find((model) => model.id === current.id);
-        if (refreshedCurrent) return refreshedCurrent;
+        if (refreshedCurrent) {
+          // 如果当前模型之前是默认模型，但刷新后不再是默认模型（用户在设置中更改了默认），
+          // 则自动切换到新的默认模型；否则保留用户手动选择的模型
+          if (current.isDefault && !refreshedCurrent.isDefault) {
+            return models.find((model) => model.isDefault) ?? refreshedCurrent;
+          }
+          return refreshedCurrent;
+        }
       }
       return models.find((model) => model.isDefault) ?? models[0] ?? null;
     });
@@ -113,6 +123,14 @@ export function AssistantPanelProvider({
         setModelList(models);
         const defaultModel = models.find((m) => m.isDefault) ?? models[0] ?? null;
         setCurrentModel(defaultModel);
+        // 将默认模型同步到后端运行时，确保首页对话使用正确的模型
+        if (defaultModel) {
+          try {
+            await chatApi.switchRuntimeModel(defaultModel.id);
+          } catch {
+            // 运行时模型同步失败不影响 UI，后端会在对话时使用服务端默认值
+          }
+        }
       } catch {
         // 加载失败时静默处理，UI 会显示加载状态
       }
@@ -190,12 +208,14 @@ export function AssistantPanelProvider({
 
   const switchModel = useCallback(async (modelConfigId: string) => {
     await chatApi.switchRuntimeModel(modelConfigId);
-    const model = modelList.find((m) => m.id === modelConfigId) ?? null;
-    setCurrentModel(model);
+    setCurrentModel((current) => {
+      if (current?.id === modelConfigId) return current;
+      return modelList.find((model) => model.id === modelConfigId) ?? current ?? null;
+    });
   }, [modelList]);
 
-  const refreshModels = useCallback(async () => {
-    await loadModels();
+  const refreshModels = useCallback(async (preferredModelId?: string) => {
+    await loadModels(preferredModelId);
   }, [loadModels]);
 
   const value = useMemo<AssistantPanelContextValue>(

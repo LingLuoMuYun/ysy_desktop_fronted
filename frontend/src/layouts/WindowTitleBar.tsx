@@ -1,4 +1,4 @@
-import { Bot, Code2, Grid2X2, History, SquarePen } from "lucide-react";
+import { Bot, Code2, Grid2X2, History, RefreshCw, SquarePen } from "lucide-react";
 import { SidebarToggle } from "../components/SidebarToggle";
 
 interface WindowTitleBarProps {
@@ -7,6 +7,7 @@ interface WindowTitleBarProps {
   moduleLabel?: string;
   resourceOverviewOpen: boolean;
   showResourceControls?: boolean;
+  onRefreshPage: () => void;
   onToggleAssistant?: () => void;
   onToggleConversationHistory?: () => void;
   onNewConversation?: () => void;
@@ -19,6 +20,7 @@ export function WindowTitleBar({
   moduleLabel,
   resourceOverviewOpen,
   showResourceControls = true,
+  onRefreshPage,
   onToggleAssistant,
   onToggleConversationHistory,
   onNewConversation,
@@ -58,6 +60,15 @@ export function WindowTitleBar({
       <div className="titlebar-right">
         {showResourceControls ? (
           <>
+            <button
+              className="icon-button titlebar-refresh-button"
+              type="button"
+              title="刷新页面状态"
+              aria-label="刷新页面状态"
+              onClick={onRefreshPage}
+            >
+              <RefreshCw size={15} />
+            </button>
             <button className="launcher-button" type="button">
               <Code2 size={14} />
               打开位置
@@ -74,15 +85,26 @@ export function WindowTitleBar({
             </button>
           </>
         ) : (
-          <button
-            className={`titlebar-assistant-button${assistantOpen ? " titlebar-assistant-button--active" : ""}`}
-            type="button"
-            aria-pressed={assistantOpen}
-            onClick={onToggleAssistant}
-          >
-            <Bot size={14} />
-            AI 助手
-          </button>
+          <>
+            <button
+              className="icon-button titlebar-refresh-button"
+              type="button"
+              title="刷新页面状态"
+              aria-label="刷新页面状态"
+              onClick={onRefreshPage}
+            >
+              <RefreshCw size={15} />
+            </button>
+            <button
+              className={`titlebar-assistant-button${assistantOpen ? " titlebar-assistant-button--active" : ""}`}
+              type="button"
+              aria-pressed={assistantOpen}
+              onClick={onToggleAssistant}
+            >
+              <Bot size={14} />
+              AI 助手
+            </button>
+          </>
         )}
       </div>
     </header>

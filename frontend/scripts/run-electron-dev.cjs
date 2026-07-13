@@ -4,10 +4,23 @@ const path = require("node:path");
 
 const DEV_SERVER_URL = "http://localhost:5174";
 const isWindows = process.platform === "win32";
-const viteBin = isWindows
-  ? path.join("node_modules", ".bin", "vite.cmd")
-  : path.join("node_modules", ".bin", "vite");
 const electronBin = String(require("electron")).trim();
+
+function getPackageBin(packageName, ...binPath) {
+  return path.join(__dirname, "..", "node_modules", packageName, ...binPath);
+}
+
+function spawnNodeCli(scriptPath, args, opts) {
+  // Windows: spawn .cmd / .bat 在 Node.js v24+ 会报 EINVAL，改用 node 直接执行 JS 入口
+  if (isWindows) {
+    return spawn(process.execPath, [scriptPath, ...args], opts);
+  }
+  return spawn(scriptPath, args, opts);
+}
+
+function spawnVite(args, opts) {
+  return spawnNodeCli(getPackageBin("vite", "bin", "vite.js"), args, opts);
+}
 
 let electronProcess;
 
@@ -35,7 +48,7 @@ function waitForServer(url, timeoutMs = 30000) {
   });
 }
 
-const viteProcess = spawn(viteBin, ["--host", "0.0.0.0", "--port", "5174", "--strictPort"], {
+const viteProcess = spawnVite(["--host", "0.0.0.0", "--port", "5174", "--strictPort"], {
   stdio: "inherit",
   env: { ...process.env },
 });

@@ -123,8 +123,14 @@ class ApiRequestError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const ipcRequest = getEnvironmentIpcRequest(path, init);
   if (ipcRequest && window.ysyDesktop?.requestEnvironment) {
-    const response = await window.ysyDesktop.requestEnvironment(ipcRequest);
-    return parseResponse<T>(response.status, response.data);
+    try {
+      const response = await window.ysyDesktop.requestEnvironment(ipcRequest);
+      return parseResponse<T>(response.status, response.data);
+    } catch (error) {
+      // IPC 调用失败（通常是 Electron 主进程无法连接后端），降级到渲染进程直接请求
+      const reason = error instanceof Error ? error.message : '未知错误';
+      console.warn(`[environments] IPC 调用失败，降级到直接请求：${reason}`);
+    }
   }
 
   return requestDirect<T>(path, init);
