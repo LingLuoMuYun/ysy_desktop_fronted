@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   CheckCircle,
   ChevronDown,
@@ -81,9 +81,11 @@ export function PromptToolbar({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeAssist = ASSIST_OPTIONS.find((o) => o.key === assistMode) ?? ASSIST_OPTIONS[0];
-  const availableModels = modelList.filter((model) => model.status === "可用");
-  const selectableModels = availableModels.length > 0 ? availableModels : modelList;
-  const activeModelLabel = currentModel?.name ?? (modelList.length > 0 ? "选择模型" : "暂无模型");
+  const selectableModels = useMemo(() => {
+    const availableModels = modelList.filter((model) => model.status === "可用");
+    return availableModels.length > 0 ? availableModels : modelList;
+  }, [modelList]);
+  const activeModelLabel = currentModel ? `模型：${currentModel.name}` : (modelList.length > 0 ? "选择模型" : "暂无模型");
 
   const handleModelSelect = async (modelId: string) => {
     if (modelId === currentModel?.id || switchingModelId) return;
@@ -287,7 +289,7 @@ export function PromptToolbar({
               >
                 <div className="prompt-dropdown__item-text">
                   <span className="prompt-dropdown__item-label">{model.name}</span>
-                  <span className="prompt-dropdown__item-desc">{model.provider} · {model.context}</span>
+                  <span className="prompt-dropdown__item-desc">Provider: {model.provider} · 上下文 {model.context}</span>
                 </div>
                 <StatusBadge label={switchingModelId === model.id ? "切换中" : model.status} tone={model.tone} />
                 {model.id === currentModel?.id && <span className="prompt-dropdown__check" />}

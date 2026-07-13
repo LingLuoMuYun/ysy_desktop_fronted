@@ -1,5 +1,5 @@
 import { Bot, ChevronDown, History, MessageSquarePlus, RefreshCw, SendHorizontal } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RouteKey } from "../app/router";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { PromptToolbar, ProjectSelect } from "../components/PromptToolbar";
@@ -48,7 +48,7 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
 
   const prompts = assistantPrompts[promptSetIndex];
   const hasMessages = messages.length > 0;
-  const availableModels = modelList.filter((m) => m.status === "可用");
+  const availableModels = useMemo(() => modelList.filter((m) => m.status === "可用"), [modelList]);
 
   // 自动滚动到底部
   useEffect(() => {
@@ -118,7 +118,7 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
               title={currentModel ? `当前模型：${currentModel.name}` : "选择模型"}
             >
               <span className="assistant-model-selector__name">
-                {currentModel?.name ?? "未选择模型"}
+                {currentModel ? `模型：${currentModel.name}` : "选择模型"}
               </span>
               <ChevronDown size={12} />
             </button>
@@ -149,7 +149,7 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
                           <StatusBadge label={model.status} tone={model.tone} />
                         </div>
                         <span className="assistant-model-selector__option-provider">
-                          {model.provider}
+                          Provider: {model.provider} · 上下文 {model.context}
                         </span>
                       </button>
                     ))}

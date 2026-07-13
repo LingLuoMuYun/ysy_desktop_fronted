@@ -21,6 +21,52 @@ const SYSTEM_TEMPLATE_GROUPS = [
 
 const SUPPORTED_SYSTEM_TEMPLATE = "llm-infer:LLM";
 
+const MODEL_PROVIDER_BASE_URLS: Record<string, string> = {
+  openrouter: "https://openrouter.ai/api/v1",
+  huggingface: "https://router.huggingface.co/v1",
+  skywork: "https://api.apifree.ai/agent/v1",
+  aihubmix: "https://aihubmix.com/v1",
+  siliconflow: "https://api.siliconflow.cn/v1",
+  novita: "https://api.novita.ai/openai",
+  volcengine: "https://ark.cn-beijing.volces.com/api/v3",
+  volcengine_coding_plan: "https://ark.cn-beijing.volces.com/api/coding/v3",
+  byteplus: "https://ark.ap-southeast.bytepluses.com/api/v3",
+  byteplus_coding_plan: "https://ark.ap-southeast.bytepluses.com/api/coding/v3",
+  openai_codex: "https://chatgpt.com/backend-api",
+  github_copilot: "https://api.githubcopilot.com",
+  deepseek: "https://api.deepseek.com",
+  gemini: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  zhipu: "https://open.bigmodel.cn/api/paas/v4",
+  dashscope: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  moonshot: "https://api.moonshot.ai/v1",
+  minimax: "https://api.minimax.io/v1",
+  minimax_anthropic: "https://api.minimax.io/anthropic",
+  mistral: "https://api.mistral.ai/v1",
+  stepfun: "https://api.stepfun.com/v1",
+  xiaomi_mimo: "https://api.xiaomimimo.com/v1",
+  longcat: "https://api.longcat.chat/openai/v1",
+  ant_ling: "https://api.ant-ling.com/v1",
+  ollama: "http://localhost:11434/v1",
+  lm_studio: "http://localhost:1234/v1",
+  atomic_chat: "http://localhost:1337/v1",
+  ovms: "http://localhost:8000/v3",
+  nvidia: "https://integrate.api.nvidia.com/v1",
+  groq: "https://api.groq.com/openai/v1",
+  qianfan: "https://qianfan.baidubce.com/v2",
+};
+
+const MODEL_PROVIDER_OPTIONS = ["custom", ...Object.keys(MODEL_PROVIDER_BASE_URLS)] as const;
+
+function normalizeModelProvider(value: string) {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function getDefaultModelBaseUrl(provider: string) {
+  const normalizedProvider = normalizeModelProvider(provider);
+  if (normalizedProvider === "custom") return "";
+  return MODEL_PROVIDER_BASE_URLS[normalizedProvider];
+}
+
 function normalizeLocalPath(value: string) {
   return value.trim().replace(/\\/g, "/");
 }
@@ -1495,7 +1541,7 @@ function ModelAddDialog({
   const [form, setForm] = useState({
     name: "",
     vendor: "",
-    apiBaseUrl: "https://api.deepseek.com/v1",
+    apiBaseUrl: "",
     modelId: "",
     apiKey: "",
     contextLength: "128K",
@@ -1504,7 +1550,16 @@ function ModelAddDialog({
   });
 
   const updateForm = (key: keyof typeof form, value: string) => {
-    setForm((current) => ({ ...current, [key]: value }));
+    setForm((current) => {
+      const next = { ...current, [key]: value };
+      if (key === "vendor") {
+        const defaultBaseUrl = getDefaultModelBaseUrl(value);
+        if (defaultBaseUrl !== undefined) {
+          next.apiBaseUrl = defaultBaseUrl;
+        }
+      }
+      return next;
+    });
   };
 
   const handleSave = () => {
@@ -1550,7 +1605,7 @@ function ModelAddDialog({
             </h3>
             <div className="model-edit-grid">
               <ModelEditField label="模型名称" value={form.name} onChange={(value) => updateForm("name", value)} />
-              <ModelEditField label="模型厂商" value={form.vendor} onChange={(value) => updateForm("vendor", value)} placeholder="例如：DeepSeek、阿里云百炼" />
+              <ModelEditField label="Provider" value={form.vendor} onChange={(value) => updateForm("vendor", value)} listId="model-provider-options" placeholder="例如：openrouter、deepseek、custom" />
               <ModelEditField className="model-edit-field--full" label="API Base URL" value={form.apiBaseUrl} onChange={(value) => updateForm("apiBaseUrl", value)} />
               <ModelEditField label="Model ID" value={form.modelId} onChange={(value) => updateForm("modelId", value)} placeholder="例如：deepseek-v4-flash" />
               <ModelEditField label="API Key" type="password" value={form.apiKey} onChange={(value) => updateForm("apiKey", value)} />
@@ -1582,6 +1637,7 @@ function ModelAddDialog({
             </button>
           </div>
         </footer>
+        <ModelProviderOptionsDatalist />
       </section>
     </div>
   );
@@ -1645,7 +1701,7 @@ function ModelDetail({
                 <span className="model-detail-info-value">{detail.name}</span>
               </div>
               <div className="model-detail-info-item">
-                <span className="model-detail-info-label">模型厂商</span>
+                <span className="model-detail-info-label">Provider</span>
                 <span className="model-detail-info-value">{detail.provider}</span>
               </div>
               <div className="model-detail-info-item model-detail-info-item--full">
@@ -1721,6 +1777,7 @@ function ModelDetail({
             </button>
           </div>
         </footer>
+        <ModelProviderOptionsDatalist />
       </section>
     </div>
   );
@@ -1749,7 +1806,16 @@ function ModelEditDialog({
   });
 
   const updateForm = (key: keyof typeof form, value: string) => {
-    setForm((current) => ({ ...current, [key]: value }));
+    setForm((current) => {
+      const next = { ...current, [key]: value };
+      if (key === "vendor") {
+        const defaultBaseUrl = getDefaultModelBaseUrl(value);
+        if (defaultBaseUrl !== undefined) {
+          next.apiBaseUrl = defaultBaseUrl;
+        }
+      }
+      return next;
+    });
   };
 
   const handleSave = () => {
@@ -1804,7 +1870,7 @@ function ModelEditDialog({
             </h3>
             <div className="model-edit-grid">
               <ModelEditField label="模型名称" value={form.name} onChange={(value) => updateForm("name", value)} />
-              <ModelEditField label="模型厂商" value={form.vendor} onChange={(value) => updateForm("vendor", value)} placeholder="例如：DeepSeek、阿里云百炼" />
+              <ModelEditField label="Provider" value={form.vendor} onChange={(value) => updateForm("vendor", value)} listId="model-provider-options" placeholder="例如：openrouter、deepseek、custom" />
               <ModelEditField className="model-edit-field--full" label="API Base URL" value={form.apiBaseUrl} onChange={(value) => updateForm("apiBaseUrl", value)} />
               <ModelEditField label="Model ID" value={form.modelId} onChange={(value) => updateForm("modelId", value)} placeholder="例如：deepseek-v4-flash" />
               <ModelEditField label="API Key" type="password" value={form.apiKey} onChange={(value) => updateForm("apiKey", value)} />
@@ -1851,6 +1917,7 @@ function ModelEditField({
   type = "text",
   className = "",
   placeholder,
+  listId,
 }: {
   label: string;
   value: string;
@@ -1858,12 +1925,30 @@ function ModelEditField({
   type?: "password" | "text";
   className?: string;
   placeholder?: string;
+  listId?: string;
 }) {
   return (
     <label className={`model-edit-field${className ? ` ${className}` : ""}`}>
       <span>{label}</span>
-      <input onChange={(e) => onChange(e.target.value)} title={value} type={type} value={value} placeholder={placeholder} />
+      <input
+        list={listId}
+        onChange={(e) => onChange(e.target.value)}
+        title={value}
+        type={type}
+        value={value}
+        placeholder={placeholder}
+      />
     </label>
+  );
+}
+
+function ModelProviderOptionsDatalist() {
+  return (
+    <datalist id="model-provider-options">
+      {MODEL_PROVIDER_OPTIONS.map((provider) => (
+        <option key={provider} value={provider} />
+      ))}
+    </datalist>
   );
 }
 
