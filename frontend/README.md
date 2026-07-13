@@ -54,7 +54,7 @@ VITE_ENVIRONMENTS_API_BASE_URL=http://127.0.0.1:8000 pnpm run electron:dev
 项目已做 Windows 适配：
 
 - 主进程 `index.ts` 通过 `process.platform` 区分 macOS/Windows，Windows 下启用 `backgroundMaterial: "mica"` 云母效果、隐藏菜单栏
-- 开发脚本 `run-electron-dev.cjs` 自动识别 Windows 平台使用 `.cmd` 可执行文件
+- 开发脚本 `run-electron-dev.cjs` 在 Windows 下不直接 `spawn()` `.cmd` / `.bat` 包装器，而是用当前 `node.exe` 执行 Vite 的 JS 入口，规避 Node.js v24.18.0 在 Windows 上执行 `.cmd` 可能出现的 `EINVAL`
 - `shell.openPath` + `shell.openExternal` 回退机制兼容各平台文件打开
 - 文件路径处理包含 `\\` → `/` 规范化，兼容 Windows 反斜杠
 - `window-all-closed` 在非 macOS 平台自动退出应用

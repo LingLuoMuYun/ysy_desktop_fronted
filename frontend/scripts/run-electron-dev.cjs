@@ -4,9 +4,25 @@ const path = require("node:path");
 
 const DEV_SERVER_URL = "http://localhost:5174";
 const isWindows = process.platform === "win32";
-const viteBin = isWindows
-  ? path.join("node_modules", ".bin", "vite.cmd")
-  : path.join("node_modules", ".bin", "vite");
+
+function getPackageBin(packageName, ...binPath) {
+  return path.join(__dirname, "..", "node_modules", packageName, ...binPath);
+}
+
+function spawnNodeCli(scriptPath, args, opts) {
+  if (isWindows) {
+    return spawn(process.execPath, [scriptPath, ...args], opts);
+  }
+
+  return spawn(scriptPath, args, opts);
+}
+
+function spawnVite(args, opts) {
+  // Node.js v24.18.0 on Windows can fail with EINVAL when spawn() executes
+  // .CMD/.bat wrappers. Call Vite's JS entry through node.exe instead.
+  return spawnNodeCli(getPackageBin("vite", "bin", "vite.js"), args, opts);
+}
+
 const electronBin = String(require("electron")).trim();
 
 let electronProcess;
@@ -35,7 +51,7 @@ function waitForServer(url, timeoutMs = 30000) {
   });
 }
 
-const viteProcess = spawn(viteBin, ["--host", "0.0.0.0", "--port", "5174", "--strictPort"], {
+const viteProcess = spawnVite(["--host", "0.0.0.0", "--port", "5174", "--strictPort"], {
   stdio: "inherit",
   env: { ...process.env },
 });
