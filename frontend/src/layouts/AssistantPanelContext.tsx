@@ -1,18 +1,14 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { assistantModelsApi } from "../services/assistantModelsApi";
 import { chatApi } from "../services/chatApi";
 import type { AssistantModelDetail } from "../types/domain";
+import type { ConversationSummary } from "./conversationTypes";
 
 // --- 对话共享状态类型 ---
 export type AssistMode = "readonly" | "assist" | "confirm";
 
-export interface PanelMessage {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  time: string;
-}
+export type PanelMessage = ConversationSummary["messages"][number];
 
 function getTimeLabel() {
   return new Intl.DateTimeFormat("zh-CN", {
@@ -30,10 +26,13 @@ interface AssistantPanelContextValue {
   toggleAssistant: () => void;
   /** 共享消息列表（跨页面保持） */
   messages: PanelMessage[];
+  conversations: ConversationSummary[];
+  activeConversationId: string;
+  selectConversation: (conversationId: string) => void;
   /** 从任意页面向助手面板发送消息（异步，等待 AI 回复） */
   sendMessage: (text: string) => Promise<void>;
-  /** 清空消息 */
-  clearMessages: () => void;
+  /** 新建空白会话 */
+  createConversation: () => void;
   /** 当前是否正在等待 AI 回复 */
   isStreaming: boolean;
   /** 模型列表 */
@@ -57,8 +56,11 @@ const AssistantPanelContext = createContext<AssistantPanelContextValue>({
   toggleSidebar: () => undefined,
   toggleAssistant: () => undefined,
   messages: [],
+  conversations: [],
+  activeConversationId: "",
+  selectConversation: () => undefined,
   sendMessage: async () => undefined,
-  clearMessages: () => undefined,
+  createConversation: () => undefined,
   isStreaming: false,
   modelList: [],
   currentModel: null,
@@ -76,20 +78,32 @@ export function AssistantPanelProvider({
   sidebarCollapsed,
   toggleSidebar,
   toggleAssistant,
+  messages,
+  conversations,
+  activeConversationId,
+  activeConversationTitle,
+  onMessagesChange,
+  onNewConversation,
+  onSelectConversation,
 }: {
   children: ReactNode;
   assistantOpen: boolean;
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
   toggleAssistant: () => void;
+  messages: ConversationSummary["messages"];
+  conversations: ConversationSummary[];
+  activeConversationId: string;
+  activeConversationTitle: string;
+  onMessagesChange: (messages: ConversationSummary["messages"], title: string) => void;
+  onNewConversation: () => void;
+  onSelectConversation: (conversationId: string) => void;
 }) {
-  const [messages, setMessages] = useState<PanelMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [modelList, setModelList] = useState<AssistantModelDetail[]>([]);
   const [currentModel, setCurrentModel] = useState<AssistantModelDetail | null>(null);
   const [assistMode, setAssistMode] = useState<AssistMode>("assist");
   const [selectedProject, setSelectedProject] = useState("none");
-  const msgCounter = useRef(0);
   const loadModels = useCallback(async (preferredModelId?: string) => {
     const models = await assistantModelsApi.list();
     setModelList(models);
@@ -145,66 +159,64 @@ export function AssistantPanelProvider({
     if (!trimmed || isStreaming) return;
 
     const time = getTimeLabel();
-    const id = msgCounter.current++;
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const userMsg: PanelMessage = { id: `user-${id}`, role: "user", text: trimmed, time };
 
     // 先添加用户消息，AI 消息用占位
     const assistantMsg: PanelMessage = { id: `assistant-${id}`, role: "assistant", text: "", time };
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    const initialMessages = [...messages, userMsg, assistantMsg];
+    const nextTitle = messages.length > 0
+      ? activeConversationTitle || trimmed.slice(0, 18)
+      : trimmed.slice(0, 18);
+
+    onMessagesChange(initialMessages, nextTitle);
     setIsStreaming(true);
 
     try {
       // 构建上下文（将历史消息作为多轮对话）
-      const existingMessages = messages;
-      const historyText = existingMessages.slice(-6).map((m) => `${m.role === "user" ? "用户" : "助手"}: ${m.text}`).join("\n");
-      const fullMessage = existingMessages.length > 0
+      const historyText = messages.slice(-6).map((m) => `${m.role === "user" ? "用户" : "助手"}: ${m.text}`).join("\n");
+      const fullMessage = messages.length > 0
         ? `[对话历史]\n${historyText}\n\n[当前消息]\n${trimmed}`
         : trimmed;
+      let replyText = "";
 
       const result = await chatApi.sendMessage(
         fullMessage,
-        "default",
+        activeConversationId || "default",
         // onDelta: 流式更新 AI 回复
         (delta) => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last && last.role === "assistant" && last.id === `assistant-${id}`) {
-              updated[updated.length - 1] = { ...last, text: last.text + delta };
-            }
-            return updated;
-          });
+          replyText += delta;
+          onMessagesChange(
+            initialMessages.map((message) =>
+              message.id === `assistant-${id}` ? { ...message, text: replyText } : message,
+            ),
+            nextTitle,
+          );
         },
+        undefined,
+        { modelConfigId: currentModel?.id },
       );
 
       // 确保最终文本完整
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last && last.role === "assistant" && last.id === `assistant-${id}`) {
-          updated[updated.length - 1] = { ...last, text: result.reply || last.text, time };
-        }
-        return updated;
-      });
+      const finalReply = result.reply || replyText;
+      onMessagesChange(
+        initialMessages.map((message) =>
+          message.id === `assistant-${id}` ? { ...message, text: finalReply, time: getTimeLabel() } : message,
+        ),
+        nextTitle,
+      );
     } catch (error) {
       const errorText = error instanceof Error ? error.message : "AI 回复失败";
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last && last.role === "assistant" && last.id === `assistant-${id}`) {
-          updated[updated.length - 1] = { ...last, text: errorText, time };
-        }
-        return updated;
-      });
+      onMessagesChange(
+        initialMessages.map((message) =>
+          message.id === `assistant-${id}` ? { ...message, text: errorText, time: getTimeLabel() } : message,
+        ),
+        nextTitle,
+      );
     } finally {
       setIsStreaming(false);
     }
-  }, [messages, isStreaming]);
-
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-    msgCounter.current = 0;
-  }, []);
+  }, [activeConversationId, activeConversationTitle, currentModel?.id, isStreaming, messages, onMessagesChange]);
 
   const switchModel = useCallback(async (modelConfigId: string) => {
     await chatApi.switchRuntimeModel(modelConfigId);
@@ -225,8 +237,11 @@ export function AssistantPanelProvider({
       toggleSidebar,
       toggleAssistant,
       messages,
+      conversations,
+      activeConversationId,
+      selectConversation: onSelectConversation,
       sendMessage,
-      clearMessages,
+      createConversation: onNewConversation,
       isStreaming,
       modelList,
       currentModel,
@@ -243,8 +258,11 @@ export function AssistantPanelProvider({
       toggleSidebar,
       toggleAssistant,
       messages,
+      conversations,
+      activeConversationId,
+      onSelectConversation,
       sendMessage,
-      clearMessages,
+      onNewConversation,
       isStreaming,
       modelList,
       currentModel,

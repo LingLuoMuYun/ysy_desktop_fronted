@@ -62,6 +62,7 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
   const activeHomeConversation = homeConversations.find((conversation) => conversation.id === activeHomeConversationId)
     ?? homeConversations[0]
     ?? createEmptyConversation();
+  const visibleConversations = homeConversations.filter((conversation) => conversation.messages.length > 0);
   const moduleLabel = isHome ? homeConversationTitle || ROUTE_LABELS.home : ROUTE_LABELS[activeRoute];
   const showAssistant = activeRoute !== "home" && assistantOpen;
   const showRightPanel = isHome ? resourceOverviewOpen : showAssistant;
@@ -158,8 +159,15 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
         <AssistantPanelProvider
           assistantOpen={showAssistant}
           sidebarCollapsed={sidebarCollapsed}
+          messages={activeHomeConversation.messages}
+          conversations={visibleConversations}
+          activeConversationId={activeHomeConversation.id}
+          activeConversationTitle={activeHomeConversation.title}
           toggleSidebar={() => setSidebarCollapsed((isCollapsed) => !isCollapsed)}
           toggleAssistant={() => setAssistantOpen((isOpen) => !isOpen)}
+          onMessagesChange={handleHomeMessagesChange}
+          onNewConversation={handleNewConversation}
+          onSelectConversation={handleSelectConversation}
         >
           <WindowTitleBar
             assistantOpen={assistantOpen}
@@ -176,7 +184,7 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
           {isHome ? (
             <ConversationHistoryPanel
               activeConversationId={activeHomeConversation.id}
-              conversations={homeConversations.filter((conversation) => conversation.messages.length > 0)}
+              conversations={visibleConversations}
               open={conversationHistoryOpen}
               onSelectConversation={handleSelectConversation}
             />

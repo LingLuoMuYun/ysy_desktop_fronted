@@ -27,12 +27,16 @@ const assistantPrompts = [
 export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
   const [promptSetIndex, setPromptSetIndex] = useState(0);
   const [draft, setDraft] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [modelSwitchError, setModelSwitchError] = useState("");
   const {
     messages,
+    conversations,
+    activeConversationId,
+    selectConversation,
     sendMessage,
-    clearMessages,
+    createConversation,
     isStreaming,
     modelList,
     currentModel,
@@ -71,6 +75,7 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
     const trimmed = draft.trim();
     if (!trimmed || isStreaming) return;
     setDraft("");
+    setHistoryOpen(false);
     await sendMessage(trimmed);
   };
 
@@ -160,19 +165,55 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
           </div>
         </div>
         <div className="assistant-header__tools">
-          <button type="button" title="历史对话">
+          <button
+            type="button"
+            title="历史对话"
+            aria-pressed={historyOpen}
+            onClick={() => setHistoryOpen((open) => !open)}
+          >
             <History size={14} />
           </button>
           <button
             type="button"
             title="新建对话"
-            onClick={clearMessages}
+            onClick={() => {
+              setHistoryOpen(false);
+              createConversation();
+            }}
             disabled={isStreaming}
           >
             <MessageSquarePlus size={14} />
           </button>
         </div>
       </div>
+
+      {historyOpen ? (
+        <div className="assistant-history" aria-label="历史对话">
+          <div className="assistant-history__title">历史对话</div>
+          {conversations.length > 0 ? (
+            <div className="assistant-history__list">
+              {conversations.map((conversation) => (
+                <button
+                  className={`assistant-history__item${
+                    conversation.id === activeConversationId ? " assistant-history__item--active" : ""
+                  }`}
+                  key={conversation.id}
+                  type="button"
+                  onClick={() => {
+                    selectConversation(conversation.id);
+                    setHistoryOpen(false);
+                  }}
+                >
+                  <span>{conversation.title}</span>
+                  <time>{conversation.updatedAt}</time>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="assistant-history__empty">暂无历史对话</div>
+          )}
+        </div>
+      ) : null}
 
       {hasMessages ? (
         <div className="assistant-messages" aria-live="polite">
