@@ -28,6 +28,7 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
   const [promptSetIndex, setPromptSetIndex] = useState(0);
   const [draft, setDraft] = useState("");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [modelSwitchError, setModelSwitchError] = useState("");
   const {
     messages,
     sendMessage,
@@ -81,12 +82,13 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
   };
 
   const handleSwitchModel = async (model: AssistantModelDetail) => {
-    setModelDropdownOpen(false);
     if (model.id === currentModel?.id) return;
     try {
+      setModelSwitchError("");
       await switchModel(model.id);
-    } catch {
-      // 切换失败时静默处理，UI 保持当前模型
+      setModelDropdownOpen(false);
+    } catch (error) {
+      setModelSwitchError(error instanceof Error ? error.message : "模型切换失败，请重试");
     }
   };
 
@@ -127,24 +129,31 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
                     暂无可用模型，请先在设置中添加
                   </div>
                 ) : (
-                  availableModels.map((model) => (
-                    <button
-                      key={model.id}
-                      className={`assistant-model-selector__option${
-                        model.id === currentModel?.id ? " assistant-model-selector__option--active" : ""
-                      }`}
-                      type="button"
-                      onClick={() => handleSwitchModel(model)}
-                    >
-                      <div className="assistant-model-selector__option-main">
-                        <span className="assistant-model-selector__option-name">{model.name}</span>
-                        <StatusBadge label={model.status} tone={model.tone} />
+                  <>
+                    {modelSwitchError && (
+                      <div className="assistant-model-selector__empty" role="alert">
+                        {modelSwitchError}
                       </div>
-                      <span className="assistant-model-selector__option-provider">
-                        {model.provider}
-                      </span>
-                    </button>
-                  ))
+                    )}
+                    {availableModels.map((model) => (
+                      <button
+                        key={model.id}
+                        className={`assistant-model-selector__option${
+                          model.id === currentModel?.id ? " assistant-model-selector__option--active" : ""
+                        }`}
+                        type="button"
+                        onClick={() => handleSwitchModel(model)}
+                      >
+                        <div className="assistant-model-selector__option-main">
+                          <span className="assistant-model-selector__option-name">{model.name}</span>
+                          <StatusBadge label={model.status} tone={model.tone} />
+                        </div>
+                        <span className="assistant-model-selector__option-provider">
+                          {model.provider}
+                        </span>
+                      </button>
+                    ))}
+                  </>
                 )}
               </div>
             )}

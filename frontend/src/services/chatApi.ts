@@ -42,6 +42,16 @@ export interface SendMessageResult {
   sessionKey?: string;
 }
 
+export interface RuntimeModelResult {
+  modelConfigId: string;
+  model?: string;
+  providerName?: string;
+  displayName?: string;
+  contextLength?: number;
+  maxOutput?: number;
+  temperature?: number;
+}
+
 export interface SessionSummary {
   session_key: string;
   conversation_id: string;
@@ -95,6 +105,79 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return envelope.data;
+}
+
+async function requestRuntimeModelSwitch(modelConfigId: string): Promise<RuntimeModelResult> {
+  let response: Response | null = null;
+  let lastNetworkError: unknown = null;
+
+  for (const baseUrl of API_BASE_CANDIDATES) {
+    try {
+      response = await fetch(`${baseUrl}/api/runtime/model`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelConfigId }),
+      });
+      break;
+    } catch (error) {
+      lastNetworkError = error;
+    }
+  }
+
+  if (!response) {
+    throw new Error(
+      `${getErrorMessage(lastNetworkError, "无法连接后端服务")}。请确认后端服务已启动。`,
+    );
+  }
+
+  const text = await response.text().catch(() => "");
+  let payload: unknown = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(`运行模型切换响应解析失败：HTTP ${response.status}`);
+  }
+
+  if (!response.ok) {
+    const message = typeof payload === "object" && payload && "error" in payload
+      ? String((payload as { error?: unknown }).error || "")
+      : "";
+    throw new Error(message || `运行模型切换失败：HTTP ${response.status}`);
+  }
+
+  if (
+    typeof payload === "object" &&
+    payload &&
+    "success" in payload
+  ) {
+    const envelope = payload as {
+      success?: boolean;
+      data?: RuntimeModelResult;
+      error?: { message?: string } | null;
+    };
+    if (!envelope.success) {
+      throw new Error(envelope.error?.message || "运行模型切换失败");
+    }
+    const data = envelope.data;
+    return data?.modelConfigId ? data : { modelConfigId };
+  }
+
+  if (
+    typeof payload === "object" &&
+    payload &&
+    "ok" in payload
+  ) {
+    const runtimePayload = payload as RuntimeModelResult & { ok?: boolean; error?: string };
+    if (runtimePayload.ok) {
+      return {
+        ...runtimePayload,
+        modelConfigId: runtimePayload.modelConfigId || modelConfigId,
+      };
+    }
+    throw new Error(runtimePayload.error || "运行模型切换失败");
+  }
+
+  throw new Error("运行模型切换响应格式不符合预期");
 }
 
 // ---- 流式对话 ----
@@ -213,11 +296,8 @@ export async function sendMessage(
 // ---- 运行时模型切换 ----
 
 /** 切换当前对话使用的模型（上传到后端运行时） */
-export async function switchRuntimeModel(modelConfigId: string): Promise<void> {
-  await request("/api/runtime/model", {
-    method: "POST",
-    body: JSON.stringify({ modelConfigId }),
-  });
+export async function switchRuntimeModel(modelConfigId: string): Promise<RuntimeModelResult> {
+  return requestRuntimeModelSwitch(modelConfigId);
 }
 
 // ---- 会话管理 ----

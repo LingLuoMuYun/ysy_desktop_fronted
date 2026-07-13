@@ -77,6 +77,7 @@ export function PromptToolbar({
   const [openMenu, setOpenMenu] = useState<"plus" | "assist" | "model" | null>(null);
   const [skillsSubOpen, setSkillsSubOpen] = useState(false);
   const [switchingModelId, setSwitchingModelId] = useState<string | null>(null);
+  const [modelSwitchError, setModelSwitchError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeAssist = ASSIST_OPTIONS.find((o) => o.key === assistMode) ?? ASSIST_OPTIONS[0];
@@ -85,13 +86,14 @@ export function PromptToolbar({
   const activeModelLabel = currentModel?.name ?? (modelList.length > 0 ? "选择模型" : "暂无模型");
 
   const handleModelSelect = async (modelId: string) => {
-    setOpenMenu(null);
     if (modelId === currentModel?.id || switchingModelId) return;
     setSwitchingModelId(modelId);
+    setModelSwitchError("");
     try {
       await switchModel(modelId);
+      setOpenMenu(null);
     } catch (error) {
-      console.warn("[PromptToolbar] 切换模型失败:", error);
+      setModelSwitchError(error instanceof Error ? error.message : "模型切换失败，请重试");
     } finally {
       setSwitchingModelId(null);
     }
@@ -267,24 +269,31 @@ export function PromptToolbar({
         {selectableModels.length === 0 ? (
           <div className="prompt-dropdown__empty">请先在设置中添加模型</div>
         ) : (
-          selectableModels.map((model) => (
-            <button
-              className={`prompt-dropdown__item prompt-dropdown__item--model${
-                model.id === currentModel?.id ? " prompt-dropdown__item--active" : ""
-              }`}
-              type="button"
-              key={model.id}
-              disabled={Boolean(switchingModelId) || model.status !== "可用"}
-              onClick={() => void handleModelSelect(model.id)}
-            >
-              <div className="prompt-dropdown__item-text">
-                <span className="prompt-dropdown__item-label">{model.name}</span>
-                <span className="prompt-dropdown__item-desc">{model.provider} · {model.context}</span>
+          <>
+            {modelSwitchError && (
+              <div className="prompt-dropdown__empty" role="alert">
+                {modelSwitchError}
               </div>
-              <StatusBadge label={switchingModelId === model.id ? "切换中" : model.status} tone={model.tone} />
-              {model.id === currentModel?.id && <span className="prompt-dropdown__check" />}
-            </button>
-          ))
+            )}
+            {selectableModels.map((model) => (
+              <button
+                className={`prompt-dropdown__item prompt-dropdown__item--model${
+                  model.id === currentModel?.id ? " prompt-dropdown__item--active" : ""
+                }`}
+                type="button"
+                key={model.id}
+                disabled={Boolean(switchingModelId) || model.status !== "可用"}
+                onClick={() => void handleModelSelect(model.id)}
+              >
+                <div className="prompt-dropdown__item-text">
+                  <span className="prompt-dropdown__item-label">{model.name}</span>
+                  <span className="prompt-dropdown__item-desc">{model.provider} · {model.context}</span>
+                </div>
+                <StatusBadge label={switchingModelId === model.id ? "切换中" : model.status} tone={model.tone} />
+                {model.id === currentModel?.id && <span className="prompt-dropdown__check" />}
+              </button>
+            ))}
+          </>
         )}
       </PortalDropdown>
 
