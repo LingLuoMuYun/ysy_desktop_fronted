@@ -611,18 +611,6 @@ function CreateEnvironmentDialog({ onClose, onCreate }: CreateEnvironmentDialogP
     setShowConfirm(false);
   };
 
-  const handleOverlayClose = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget && !isSubmitting) {
-      onClose();
-    }
-  };
-
-  const handleConfirmOverlayClose = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget && !isSubmitting) {
-      handleBackFromConfirm();
-    }
-  };
-
   // ---- file/folder picker refs ----
   const envPathInputRef = useRef<HTMLInputElement>(null);
   const interpreterPathInputRef = useRef<HTMLInputElement>(null);
@@ -772,7 +760,7 @@ function CreateEnvironmentDialog({ onClose, onCreate }: CreateEnvironmentDialogP
 
   if (showSuccess) {
     return (
-      <div className="env-create-overlay" onClick={handleOverlayClose}>
+      <div className="env-create-overlay">
         <section
           aria-modal="true"
           className="env-create-dialog env-create-dialog--success"
@@ -791,7 +779,7 @@ function CreateEnvironmentDialog({ onClose, onCreate }: CreateEnvironmentDialogP
 
   if (showConfirm) {
     return (
-      <div className="env-create-overlay" onClick={handleConfirmOverlayClose}>
+      <div className="env-create-overlay">
         <section
           aria-modal="true"
           className="env-create-dialog env-create-dialog--confirm"
@@ -854,7 +842,7 @@ function CreateEnvironmentDialog({ onClose, onCreate }: CreateEnvironmentDialogP
   }
 
   return (
-    <div className="env-create-overlay" onClick={handleOverlayClose}>
+    <div className="env-create-overlay">
       <section
         aria-labelledby="env-create-title"
         aria-modal="true"
@@ -1582,7 +1570,7 @@ function ModelAddDialog({
   };
 
   return (
-    <div className="model-edit-overlay" onClick={onClose}>
+    <div className="model-edit-overlay">
       <section
         aria-labelledby="model-add-title"
         aria-modal="true"
@@ -1658,7 +1646,7 @@ function ModelDetail({
   onTest: () => void;
 }) {
   return (
-    <div className="model-edit-overlay" onClick={onBack}>
+    <div className="model-edit-overlay">
       <section
         aria-labelledby="model-detail-title"
         aria-modal="true"
@@ -1834,7 +1822,7 @@ function ModelEditDialog({
   };
 
   return (
-    <div className="model-edit-overlay" onClick={onClose}>
+    <div className="model-edit-overlay">
       <section
         aria-labelledby="model-edit-title"
         aria-modal="true"
@@ -1990,7 +1978,7 @@ function EnvironmentDeleteDialog({
 
   if (showLocalConfirm) {
     return (
-      <div className="confirm-overlay" onClick={onCancel}>
+      <div className="confirm-overlay">
         <div className="confirm-dialog confirm-dialog--environment confirm-dialog--local-delete" onClick={(e) => e.stopPropagation()}>
           <div className="confirm-dialog__header confirm-dialog__header--plain">
             <h2>确认删除本地环境</h2>
@@ -2024,7 +2012,7 @@ function EnvironmentDeleteDialog({
   }
 
   return (
-    <div className="confirm-overlay" onClick={onCancel}>
+    <div className="confirm-overlay">
       <div className="confirm-dialog confirm-dialog--environment" onClick={(e) => e.stopPropagation()}>
         <div className="confirm-dialog__header confirm-dialog__header--plain">
           <h2>确认删除环境</h2>
@@ -2109,7 +2097,7 @@ function ConfirmDialog({
   resourceType?: string;
 }) {
   return (
-    <div className="confirm-overlay" onClick={onCancel}>
+    <div className="confirm-overlay">
       <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="confirm-dialog__header">
           <XCircle size={22} className="confirm-dialog__icon" />
