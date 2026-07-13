@@ -736,6 +736,112 @@ body {
   border-radius: 0;
 }
 
+.ai-form-preview {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 14px;
+  color: #263241;
+  background: #fbfcfd;
+  border: 1px solid #dfe7ef;
+  border-radius: 8px;
+}
+
+.ai-form-preview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-form-preview__header h3 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.ai-form-preview__header span {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  color: #5f6d7a;
+  font-size: 12px;
+  line-height: 1.2;
+  background: #eef3f8;
+  border: 1px solid #d9e3ed;
+  border-radius: 999px;
+}
+
+.ai-form-preview__description {
+  margin: 0;
+  color: #5f6d7a;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.ai-form-preview__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ai-form-preview__field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ai-form-preview__label {
+  color: #4b5966;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.ai-form-preview__label em {
+  margin-left: 3px;
+  color: #d23f31;
+  font-style: normal;
+}
+
+.ai-form-preview input,
+.ai-form-preview select,
+.ai-form-preview textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  color: #2c3745;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  background: #f6f8fa;
+  border: 1px solid #dce4ed;
+  border-radius: 6px;
+}
+
+.ai-form-preview textarea {
+  resize: vertical;
+}
+
+.ai-form-preview__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  color: #2c3745;
+  font-size: 13px;
+}
+
+.ai-form-preview__checkbox input {
+  width: 16px;
+  height: 16px;
+}
+
+.ai-form-preview small {
+  color: #728091;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* ---- highlight.js 语法高亮配色 (GitHub 风格) ---- */
 .markdown-body .hljs-keyword,
 .markdown-body .hljs-selector-tag,

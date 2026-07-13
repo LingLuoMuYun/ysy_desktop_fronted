@@ -1,4 +1,5 @@
-import { Component, useMemo } from "react";
+import { Component, isValidElement, useMemo } from "react";
+import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -43,6 +44,193 @@ class MarkdownErrorBoundary extends Component<
   }
 }
 
+type FormFieldOption = string | { label?: string; value?: string };
+
+interface FormFieldPreview {
+  name: string;
+  label: string;
+  type: string;
+  value?: string | number | boolean | null;
+  placeholder?: string;
+  required?: boolean;
+  description?: string;
+  options?: FormFieldOption[];
+}
+
+interface FormPreviewModel {
+  title: string;
+  description?: string;
+  fields: FormFieldPreview[];
+}
+
+interface CodeElementProps {
+  className?: string;
+  children?: ReactNode;
+}
+
+function extractText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(extractText).join("");
+  }
+
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return extractText(node.props.children);
+  }
+
+  return "";
+}
+
+function getCodeLanguage(className?: string) {
+  return className?.split(/\s+/).find((name) => name.startsWith("language-"))?.replace("language-", "") ?? "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringifyFieldValue(value: FormFieldPreview["value"]) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "boolean") return value ? "是" : "否";
+  return String(value);
+}
+
+function normalizeOption(option: FormFieldOption) {
+  if (typeof option === "string") {
+    return { label: option, value: option };
+  }
+
+  return {
+    label: option.label ?? option.value ?? "",
+    value: option.value ?? option.label ?? "",
+  };
+}
+
+function normalizeField(rawField: unknown, index: number): FormFieldPreview | null {
+  if (!isRecord(rawField)) return null;
+
+  const rawName = rawField.name ?? rawField.key ?? rawField.id ?? `field_${index + 1}`;
+  const rawLabel = rawField.label ?? rawField.title ?? rawField.name ?? rawField.key ?? `字段 ${index + 1}`;
+  const rawType = rawField.type ?? rawField.inputType ?? "text";
+  const rawOptions = Array.isArray(rawField.options) ? rawField.options : undefined;
+  const rawDescription = rawField.description ?? rawField.help ?? rawField.hint;
+  const rawValue = rawField.value ?? rawField.defaultValue ?? rawField.default ?? "";
+
+  return {
+    name: String(rawName),
+    label: String(rawLabel),
+    type: String(rawType),
+    value: typeof rawValue === "string" || typeof rawValue === "number" || typeof rawValue === "boolean" || rawValue === null
+      ? rawValue
+      : JSON.stringify(rawValue),
+    placeholder: typeof rawField.placeholder === "string" ? rawField.placeholder : undefined,
+    required: Boolean(rawField.required),
+    description: typeof rawDescription === "string" ? rawDescription : undefined,
+    options: rawOptions?.filter((option): option is FormFieldOption =>
+      typeof option === "string" || isRecord(option),
+    ),
+  };
+}
+
+function payloadToFields(payload: Record<string, unknown>) {
+  return Object.entries(payload).map(([name, value], index) => normalizeField({
+    name,
+    label: name,
+    type: typeof value === "boolean" ? "checkbox" : "text",
+    value: typeof value === "object" && value !== null ? JSON.stringify(value) : value,
+  }, index)).filter((field): field is FormFieldPreview => Boolean(field));
+}
+
+function parseFormPreview(rawCode: string, language: string): FormPreviewModel | null {
+  const normalizedLanguage = language.toLowerCase();
+  const canParseAsForm = ["json", "form", "schema"].includes(normalizedLanguage);
+  if (!canParseAsForm) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawCode);
+  } catch {
+    return null;
+  }
+
+  const source = isRecord(parsed) && isRecord(parsed.form) ? parsed.form : parsed;
+  const titleSource = isRecord(parsed) ? parsed : {};
+
+  if (Array.isArray(source)) {
+    const fields = source.map(normalizeField).filter((field): field is FormFieldPreview => Boolean(field));
+    return fields.length > 0 ? { title: "表单预览", fields } : null;
+  }
+
+  if (!isRecord(source)) return null;
+
+  const rawFields = Array.isArray(source.fields) ? source.fields : undefined;
+  const fields = rawFields
+    ? rawFields.map(normalizeField).filter((field): field is FormFieldPreview => Boolean(field))
+    : isRecord(source.payload)
+      ? payloadToFields(source.payload)
+      : isRecord(titleSource.payload)
+        ? payloadToFields(titleSource.payload)
+        : [];
+
+  if (fields.length === 0) return null;
+
+  const title = source.title ?? source.name ?? titleSource.title ?? titleSource.actionType ?? "表单预览";
+  const description = source.description ?? titleSource.riskSummary;
+
+  return {
+    title: String(title),
+    description: typeof description === "string" ? description : undefined,
+    fields,
+  };
+}
+
+function FormPreview({ model }: { model: FormPreviewModel }) {
+  return (
+    <section className="ai-form-preview" aria-label={model.title}>
+      <div className="ai-form-preview__header">
+        <h3>{model.title}</h3>
+        <span>只读草稿</span>
+      </div>
+      {model.description ? <p className="ai-form-preview__description">{model.description}</p> : null}
+      <div className="ai-form-preview__grid">
+        {model.fields.map((field) => (
+          <label className="ai-form-preview__field" key={field.name}>
+            <span className="ai-form-preview__label">
+              {field.label}
+              {field.required ? <em>*</em> : null}
+            </span>
+            {field.type === "select" && field.options?.length ? (
+              <select value={stringifyFieldValue(field.value)} disabled>
+                {field.options.map((option) => {
+                  const normalized = normalizeOption(option);
+                  return (
+                    <option key={`${field.name}-${normalized.value}`} value={normalized.value}>
+                      {normalized.label}
+                    </option>
+                  );
+                })}
+              </select>
+            ) : field.type === "textarea" || stringifyFieldValue(field.value).length > 72 ? (
+              <textarea value={stringifyFieldValue(field.value)} placeholder={field.placeholder} rows={3} disabled />
+            ) : field.type === "checkbox" ? (
+              <span className="ai-form-preview__checkbox">
+                <input checked={Boolean(field.value)} type="checkbox" disabled />
+                <span>{stringifyFieldValue(field.value) || "否"}</span>
+              </span>
+            ) : (
+              <input value={stringifyFieldValue(field.value)} placeholder={field.placeholder} type="text" disabled />
+            )}
+            {field.description ? <small>{field.description}</small> : null}
+          </label>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /**
  * Markdown 渲染组件。
  *
@@ -73,6 +261,20 @@ export function MarkdownRenderer({ content, isStreaming = false }: MarkdownRende
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeHighlight]}
+          components={{
+            pre({ children, ...props }) {
+              const codeElement = isValidElement<CodeElementProps>(children) ? children : null;
+              const codeText = extractText(codeElement?.props.children).trim();
+              const language = getCodeLanguage(codeElement?.props.className);
+              const formPreview = parseFormPreview(codeText, language);
+
+              if (formPreview) {
+                return <FormPreview model={formPreview} />;
+              }
+
+              return <pre {...props}>{children}</pre>;
+            },
+          }}
         >
           {content}
         </ReactMarkdown>
