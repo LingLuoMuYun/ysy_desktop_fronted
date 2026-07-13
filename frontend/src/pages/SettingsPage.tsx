@@ -3,10 +3,9 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import { StatusBadge } from "../components/StatusBadge";
 import { Toast } from "../components/Toast";
 import { useAssistantPanel } from "../layouts/AssistantPanelContext";
-import { assistantModelDetails, assistantModels } from "../mocks/prototypeData";
 import { assistantModelsApi, type AssistantModelFormInput } from "../services/assistantModelsApi";
 import { environmentsApi, type EnvironmentCreateInput, type EnvironmentImportInput } from "../services/environmentsApi";
-import type { AssistantModelDetail, RuntimeEnvironmentSummary } from "../types/domain";
+import type { AssistantModelDetail, AssistantModelSummary, RuntimeEnvironmentSummary } from "../types/domain";
 
 type SettingsTab = "environment" | "assistant" | "profile";
 type EnvironmentCreateMode = "system" | "import" | "custom";
@@ -105,8 +104,8 @@ export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>(() => getInitialSettingsTab());
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [envList, setEnvList] = useState<RuntimeEnvironmentSummary[]>([]);
-  const [modelList, setModelList] = useState(assistantModels);
-  const [modelDetails, setModelDetails] = useState(assistantModelDetails);
+  const [modelList, setModelList] = useState<AssistantModelSummary[]>([]);
+  const [modelDetails, setModelDetails] = useState<Record<string, AssistantModelDetail>>({});
   const [deleteTarget, setDeleteTarget] = useState<RuntimeEnvironmentSummary | null>(null);
   const [modelDeleteTarget, setModelDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [isCreateEnvironmentOpen, setIsCreateEnvironmentOpen] = useState(false);
@@ -335,7 +334,7 @@ export function SettingsPage() {
                         id,
                         id === modelId ? defaultModel : { ...detail, isDefault: false },
                       ]),
-                    ) as typeof assistantModelDetails,
+                    ) as Record<string, AssistantModelDetail>,
                   );
                   await refreshModels(defaultModel.id);
                   await switchModel(defaultModel.id);
@@ -1368,8 +1367,8 @@ function AssistantModelSettings({
   onCloseAddModel,
   onAddModel,
 }: {
-  models: typeof assistantModels;
-  modelDetails: typeof assistantModelDetails;
+  models: AssistantModelSummary[];
+  modelDetails: Record<string, AssistantModelDetail>;
   isLoading: boolean;
   selectedModelId: string | null;
   onSelectModel: (id: string) => void;
