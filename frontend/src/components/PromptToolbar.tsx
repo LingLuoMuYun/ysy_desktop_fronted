@@ -56,7 +56,7 @@ interface PromptToolbarProps {
   assistClassName?: string;
   modelClassName?: string;
   onFilesSelected?: (files: File[]) => void;
-  onAttachmentsSelected?: (attachments: Array<{ name: string; path: string }>) => void;
+  onAttachmentsSelected?: (attachments: Array<{ name: string; path: string; kind?: "file" | "directory" }>) => void;
   onPlanModeToggle?: () => void;
   onSkillToggle?: (skill: SkillOption) => void;
 }

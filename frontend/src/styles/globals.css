@@ -1359,6 +1359,100 @@ body {
   fill: #1d5fbf;
 }
 
+.file-format-icon--folder .file-format-icon__sheet {
+  fill: #fff4d6;
+  stroke: #d69e2e;
+}
+
+.file-format-icon--folder .file-format-icon__fold {
+  stroke: #d69e2e;
+}
+
+.file-format-icon--folder .file-format-icon__label {
+  fill: #8a5a00;
+}
+
+.file-format-icon--code .file-format-icon__sheet,
+.file-format-icon--script .file-format-icon__sheet {
+  fill: #edf7ff;
+  stroke: #2b8bd8;
+}
+
+.file-format-icon--code .file-format-icon__fold,
+.file-format-icon--script .file-format-icon__fold {
+  stroke: #2b8bd8;
+}
+
+.file-format-icon--code .file-format-icon__label,
+.file-format-icon--script .file-format-icon__label {
+  fill: #1261a6;
+}
+
+.file-format-icon--data .file-format-icon__sheet {
+  fill: #eafaf1;
+  stroke: #2f9e64;
+}
+
+.file-format-icon--data .file-format-icon__fold {
+  stroke: #2f9e64;
+}
+
+.file-format-icon--data .file-format-icon__label {
+  fill: #1f7a4a;
+}
+
+.file-format-icon--document .file-format-icon__sheet {
+  fill: #f3f5f8;
+  stroke: #697386;
+}
+
+.file-format-icon--document .file-format-icon__fold {
+  stroke: #697386;
+}
+
+.file-format-icon--document .file-format-icon__label {
+  fill: #4f5b6d;
+}
+
+.file-format-icon--image .file-format-icon__sheet {
+  fill: #fff0f6;
+  stroke: #d63384;
+}
+
+.file-format-icon--image .file-format-icon__fold {
+  stroke: #d63384;
+}
+
+.file-format-icon--image .file-format-icon__label {
+  fill: #a61e4d;
+}
+
+.file-format-icon--archive .file-format-icon__sheet {
+  fill: #fff4e6;
+  stroke: #e67700;
+}
+
+.file-format-icon--archive .file-format-icon__fold {
+  stroke: #e67700;
+}
+
+.file-format-icon--archive .file-format-icon__label {
+  fill: #ad5700;
+}
+
+.file-format-icon--model .file-format-icon__sheet {
+  fill: #f3efff;
+  stroke: #7c3aed;
+}
+
+.file-format-icon--model .file-format-icon__fold {
+  stroke: #7c3aed;
+}
+
+.file-format-icon--model .file-format-icon__label {
+  fill: #5b21b6;
+}
+
 .prompt-attachment__remove {
   position: absolute;
   top: -7px;

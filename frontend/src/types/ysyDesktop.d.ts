@@ -4,7 +4,7 @@ declare global {
   interface Window {
     ysyDesktop?: {
       platform: string;
-      selectAttachments?: () => Promise<Array<{ name: string; path: string }>>;
+      selectAttachments?: () => Promise<Array<{ name: string; path: string; kind?: "file" | "directory" }>>;
       getFilePath?: (file: File) => string;
       selectDirectory?: (title?: string) => Promise<string | null>;
       selectFile?: (title?: string) => Promise<string | null>;

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, screen, shell } from "electron";
+import { stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -236,14 +237,25 @@ void app.whenReady().then(() => {
     ipcMain.handle("environment:request", (_event, request) => requestEnvironmentApi(request));
     ipcMain.handle("file:select-attachments", async () => {
         const result = await dialog.showOpenDialog({
-            properties: ["openFile", "multiSelections"],
+            properties: ["openFile", "openDirectory", "multiSelections"],
         });
         if (result.canceled) {
             return [];
         }
-        return result.filePaths.map((filePath) => ({
-            name: path.basename(filePath),
-            path: filePath,
+        return Promise.all(result.filePaths.map(async (filePath) => {
+            let kind = "file";
+            try {
+                const fileStat = await stat(filePath);
+                kind = fileStat.isDirectory() ? "directory" : "file";
+            }
+            catch {
+                kind = "file";
+            }
+            return {
+                name: path.basename(filePath),
+                path: filePath,
+                kind,
+            };
         }));
     });
     ipcMain.handle("file:select-directory", async (_event, title) => {

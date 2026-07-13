@@ -25,6 +25,7 @@ export interface ChatMessage {
 interface ChatAttachment {
   name: string;
   path: string;
+  kind?: "file" | "directory";
   /** 浏览器回退：保留原始 File 对象，当 path 为空时用它生成 blob URL 打开 */
   file?: File;
 }
@@ -32,12 +33,46 @@ interface ChatAttachment {
 interface FileFormatIconMeta {
   label: string;
   title: string;
-  tone: "markdown" | "default";
+  tone: "archive" | "code" | "data" | "document" | "folder" | "image" | "markdown" | "model" | "script" | "default";
 }
 
 const FILE_FORMAT_ICONS: Record<string, FileFormatIconMeta> = {
+  "": { label: "FILE", title: "文件", tone: "default" },
+  bmp: { label: "IMG", title: "图片文件", tone: "image" },
+  ckpt: { label: "MDL", title: "模型权重文件", tone: "model" },
+  csv: { label: "CSV", title: "CSV 数据文件", tone: "data" },
+  doc: { label: "DOC", title: "Word 文档", tone: "document" },
+  docx: { label: "DOC", title: "Word 文档", tone: "document" },
+  gif: { label: "IMG", title: "图片文件", tone: "image" },
+  gz: { label: "ZIP", title: "压缩包", tone: "archive" },
+  ipynb: { label: "NB", title: "Notebook 文件", tone: "code" },
+  jpeg: { label: "IMG", title: "图片文件", tone: "image" },
+  jpg: { label: "IMG", title: "图片文件", tone: "image" },
+  json: { label: "JSON", title: "JSON 数据文件", tone: "data" },
+  jsonl: { label: "JSL", title: "JSONL 数据文件", tone: "data" },
+  log: { label: "LOG", title: "日志文件", tone: "document" },
   md: { label: "MD", title: "Markdown 文件", tone: "markdown" },
   markdown: { label: "MD", title: "Markdown 文件", tone: "markdown" },
+  onnx: { label: "MDL", title: "ONNX 模型文件", tone: "model" },
+  pdf: { label: "PDF", title: "PDF 文档", tone: "document" },
+  png: { label: "IMG", title: "图片文件", tone: "image" },
+  ppt: { label: "PPT", title: "演示文稿", tone: "document" },
+  pptx: { label: "PPT", title: "演示文稿", tone: "document" },
+  py: { label: "PY", title: "Python 脚本", tone: "script" },
+  rar: { label: "ZIP", title: "压缩包", tone: "archive" },
+  safetensors: { label: "MDL", title: "模型权重文件", tone: "model" },
+  sh: { label: "SH", title: "Shell 脚本", tone: "script" },
+  tar: { label: "TAR", title: "归档文件", tone: "archive" },
+  toml: { label: "CFG", title: "配置文件", tone: "code" },
+  ts: { label: "TS", title: "TypeScript 文件", tone: "code" },
+  tsx: { label: "TSX", title: "TSX 文件", tone: "code" },
+  txt: { label: "TXT", title: "文本文件", tone: "document" },
+  webp: { label: "IMG", title: "图片文件", tone: "image" },
+  xls: { label: "XLS", title: "表格文件", tone: "data" },
+  xlsx: { label: "XLS", title: "表格文件", tone: "data" },
+  yaml: { label: "YML", title: "YAML 配置文件", tone: "code" },
+  yml: { label: "YML", title: "YAML 配置文件", tone: "code" },
+  zip: { label: "ZIP", title: "压缩包", tone: "archive" },
 };
 
 const DEFAULT_FILE_FORMAT_ICON: FileFormatIconMeta = {
@@ -71,6 +106,25 @@ function getAttachmentExtension(attachment: ChatAttachment) {
 }
 
 function AttachmentFormatIcon({ attachment }: { attachment: ChatAttachment }) {
+  if (attachment.kind === "directory") {
+    const folderIcon: FileFormatIconMeta = { label: "DIR", title: "文件夹", tone: "folder" };
+    return (
+      <span
+        className={`file-format-icon file-format-icon--${folderIcon.tone}`}
+        aria-hidden="true"
+        title={folderIcon.title}
+      >
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path className="file-format-icon__sheet" d="M4 6.5h6.1l1.75 2H20v10.75H4V6.5Z" />
+          <path className="file-format-icon__fold" d="M4 9h16" />
+          <text className="file-format-icon__label" x="12" y="16.5" textAnchor="middle">
+            {folderIcon.label}
+          </text>
+        </svg>
+      </span>
+    );
+  }
+
   const extension = getAttachmentExtension(attachment);
   const icon = FILE_FORMAT_ICONS[extension] ?? DEFAULT_FILE_FORMAT_ICON;
 

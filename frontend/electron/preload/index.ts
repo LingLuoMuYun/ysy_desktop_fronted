@@ -4,7 +4,7 @@ contextBridge.exposeInMainWorld("ysyDesktop", {
   platform: process.platform,
   selectAttachments() {
     return ipcRenderer.invoke("file:select-attachments") as Promise<
-      Array<{ name: string; path: string }>
+      Array<{ name: string; path: string; kind?: "file" | "directory" }>
     >;
   },
   getFilePath(file: File) {
