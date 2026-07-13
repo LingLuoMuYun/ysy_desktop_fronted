@@ -113,13 +113,6 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-class ApiRequestError extends Error {
-  constructor(message: string, readonly status: number) {
-    super(message);
-    this.name = "ApiRequestError";
-  }
-}
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const ipcRequest = getEnvironmentIpcRequest(path, init);
   if (ipcRequest && window.ysyDesktop?.requestEnvironment) {
@@ -201,74 +194,16 @@ function parseResponse<T>(status: number, data: unknown): T {
       || envelope?.error?.suggestion
       || responseMessage
       || (status >= 500 ? `运行环境后端内部错误（HTTP ${status}）` : `请求失败：HTTP ${status}`);
-    throw new ApiRequestError(message, status);
+    throw new Error(message);
   }
   return envelope.data;
-}
-
-async function recoverEnvironmentList(status: string): Promise<PaginatedResponse<BackendEnvironment> | null> {
-  const pages = new Map<number, BackendEnvironment[]>();
-  const failedPages = new Set<number>();
-  let total: number | null = null;
-  let reportedTotal = 0;
-
-  for (let page = 1; page <= 200; page += 1) {
-    try {
-      const result = await requestDirect<PaginatedResponse<BackendEnvironment>>(
-        `/api/environments?${new URLSearchParams({ status, page: String(page), pageSize: "1" }).toString()}`,
-      );
-      pages.set(page, result.items);
-      reportedTotal = result.total;
-      total = Math.min(result.total, 200);
-      break;
-    } catch (error) {
-      if (!(error instanceof ApiRequestError) || error.status < 500) throw error;
-      failedPages.add(page);
-    }
-  }
-
-  if (total === null) return null;
-  for (let page = 1; page <= total; page += 1) {
-    if (pages.has(page) || failedPages.has(page)) continue;
-    try {
-      const result = await requestDirect<PaginatedResponse<BackendEnvironment>>(
-        `/api/environments?${new URLSearchParams({ status, page: String(page), pageSize: "1" }).toString()}`,
-      );
-      pages.set(page, result.items);
-    } catch (error) {
-      if (!(error instanceof ApiRequestError) || error.status < 500) throw error;
-      failedPages.add(page);
-    }
-  }
-
-  const items = [...pages.entries()]
-    .sort(([left], [right]) => left - right)
-    .flatMap(([, pageItems]) => pageItems);
-  return {
-    items,
-    page: 1,
-    pageSize: 20,
-    total: items.length,
-    hasMore: false,
-    omittedCount: failedPages.size + Math.max(0, reportedTotal - total),
-  };
 }
 
 const environmentListRequests = new Map<string, Promise<EnvironmentListResult>>();
 
 async function loadEnvironmentList(status: string): Promise<EnvironmentListResult> {
   const params = new URLSearchParams({ status, page: "1", pageSize: "20" });
-  let page: PaginatedResponse<BackendEnvironment>;
-  try {
-    page = await request<PaginatedResponse<BackendEnvironment>>(`/api/environments?${params.toString()}`);
-  } catch (error) {
-    if (window.ysyDesktop?.requestEnvironment || !(error instanceof ApiRequestError) || error.status < 500) {
-      throw error;
-    }
-    const recoveredPage = await recoverEnvironmentList(status);
-    if (!recoveredPage) throw error;
-    page = recoveredPage;
-  }
+  const page = await request<PaginatedResponse<BackendEnvironment>>(`/api/environments?${params.toString()}`);
   return {
     environments: page.items.map(mapEnvironment),
     omittedCount: page.omittedCount || 0,

@@ -54,6 +54,7 @@ export function HomePage({ messages = [], onConversationTitleChange, onMessagesC
   const [isFading, setIsFading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sendInFlightRef = useRef(false);
   const activeStreamRef = useRef<{
     assistantId: string;
     baseMessages: ChatMessage[];
@@ -83,7 +84,8 @@ export function HomePage({ messages = [], onConversationTitleChange, onMessagesC
 
   const handleSend = useCallback(async () => {
     const trimmed = inputValue.trim();
-    if (!trimmed || isStreaming) return;
+    if (!trimmed || isStreaming || sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
     typewriter.reset();
     const time = getCurrentTimeLabel();
     const assistantId = `assistant-${Date.now()}`;
@@ -141,6 +143,7 @@ export function HomePage({ messages = [], onConversationTitleChange, onMessagesC
       );
     } finally {
       setIsStreaming(false);
+      sendInFlightRef.current = false;
       activeStreamRef.current = null;
       textareaRef.current?.focus();
     }

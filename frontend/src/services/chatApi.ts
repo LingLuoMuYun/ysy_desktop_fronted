@@ -303,8 +303,7 @@ export async function editLatestMessage(
   conversationId: string,
   newMessage: string,
 ): Promise<SendMessageResult> {
-  const reader = await sendMessageStream("__EDIT_LATEST__", conversationId);
-  // 这个需要特殊的处理，暂时用简单方式
+  // 当前 UI 尚未接入 edit-latest 专用接口，先降级为普通发送，避免创建未消费的流式请求。
   return sendMessage(newMessage, conversationId);
 }
 

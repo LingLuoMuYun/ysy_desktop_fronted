@@ -12,6 +12,7 @@
 - 前端全局规则读取 `openspec/frontend/global/global.spec.md`。
 - 前端模块规则读取 `openspec/frontend/modules/frontend.spec.md`。
 - 当前仓库不再使用 `docs/specs/`；不要重新创建平行 specs 目录。OpenSpec 导航入口见 `openspec/README.md`。
+- 启动项目时默认使用 `pnpm run electron:dev`
 
 ## 必读顺序
 
@@ -195,10 +196,4 @@ Page / Route -> Feature -> Hook / Service / Store -> API Client -> 后端
 - React Hook Form、Zod。
 - `@/` 绝对导入。
 - 完全禁止所有 cross-feature import。
-
-## 回复规范
-
-- 所有回复使用中文。
-- 简洁说明做了什么、验证了什么、哪些没做、需要确认什么。
-- 对不确定内容标注“待确认”或“未验证”。
-- 不在未获得确认时输出承诺式表述。
+ 

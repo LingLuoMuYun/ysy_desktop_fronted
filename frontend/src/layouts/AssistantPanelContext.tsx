@@ -91,6 +91,7 @@ export function AssistantPanelProvider({
   const [assistMode, setAssistMode] = useState<AssistMode>("assist");
   const [selectedProject, setSelectedProject] = useState("none");
   const msgCounter = useRef(0);
+  const sendInFlightRef = useRef(false);
   const activeStreamRef = useRef<{
     assistantId: string;
     displayedText: string;
@@ -145,7 +146,8 @@ export function AssistantPanelProvider({
 
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed || isStreaming) return;
+    if (!trimmed || isStreaming || sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
     typewriter.reset();
 
     const time = getTimeLabel();
@@ -196,6 +198,7 @@ export function AssistantPanelProvider({
       });
     } finally {
       setIsStreaming(false);
+      sendInFlightRef.current = false;
       activeStreamRef.current = null;
     }
   }, [messages, isStreaming, typewriter]);
