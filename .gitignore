@@ -8,9 +8,11 @@ __pycache__/
 # Build outputs
 dist/
 build/
+release/
 .next/
 out/
 coverage/
+*.tsbuildinfo
 
 # Local config
 .env
@@ -26,6 +28,10 @@ logs/
 Thumbs.db
 .idea/
 .vscode/
+
+# AI / Tool caches
+.codex/
+.pnpm-store/
 
 # App runtime data
 data/
