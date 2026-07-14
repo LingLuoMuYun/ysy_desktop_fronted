@@ -4322,6 +4322,21 @@ body {
   box-shadow: 0 4px 12px rgba(47, 115, 246, 0.18);
 }
 
+.assistant-model-card__icon.assistant-model-card__icon--image {
+  overflow: hidden;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid #e0e8f3;
+}
+
+.assistant-model-card__icon--image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+
 .assistant-model-card__icon--blue {
   background: linear-gradient(135deg, #2f73f6 0%, #08b879 100%);
 }

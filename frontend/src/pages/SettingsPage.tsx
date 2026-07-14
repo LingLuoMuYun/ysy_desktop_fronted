@@ -2,6 +2,7 @@ import { Activity, Bot, CheckCircle2, FolderOpen, Info, Pencil, Plus, RotateCw, 
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { StatusBadge } from "../components/StatusBadge";
 import { Toast } from "../components/Toast";
+import { ModelVendorAvatar } from "../components/ModelVendorAvatar";
 import { useAssistantPanel } from "../layouts/AssistantPanelContext";
 import { assistantModelsApi, type AssistantModelFormInput } from "../services/assistantModelsApi";
 import { environmentsApi, type EnvironmentCreateInput, type EnvironmentImportInput } from "../services/environmentsApi";
@@ -1413,9 +1414,7 @@ function AssistantModelSettings({
             onClick={() => onSelectModel(model.id)}
           >
             <div className="assistant-model-card__header">
-              <div className={`assistant-model-card__icon assistant-model-card__icon--${model.variant}`}>
-                <Bot size={20} />
-              </div>
+              <ModelVendorAvatar provider={model.provider} variant={model.variant} />
               <div className="assistant-model-card__badges">
                 <StatusBadge label={model.status} tone={model.tone} />
                 {model.isDefault ? <span className="default-pill">默认</span> : null}
@@ -1663,9 +1662,11 @@ function ModelDetail({
         <div className="model-edit-dialog__content">
           {/* 模型摘要 */}
           <div className="model-edit-summary">
-            <div className={`model-edit-summary__icon assistant-model-card__icon--${detail.variant}`}>
-              <Bot size={20} />
-            </div>
+            <ModelVendorAvatar
+              className="model-edit-summary__icon"
+              provider={detail.provider}
+              variant={detail.variant}
+            />
             <div className="model-edit-summary__text">
               <div className="model-edit-summary__title-row">
                 <h3>{detail.name}</h3>
@@ -1838,9 +1839,11 @@ function ModelEditDialog({
 
         <div className="model-edit-dialog__content">
           <div className="model-edit-summary">
-            <div className={`model-edit-summary__icon assistant-model-card__icon--${detail.variant}`}>
-              <Bot size={20} />
-            </div>
+            <ModelVendorAvatar
+              className="model-edit-summary__icon"
+              provider={detail.provider}
+              variant={detail.variant}
+            />
             <div className="model-edit-summary__text">
               <div className="model-edit-summary__title-row">
                 <h3>{form.name || detail.name}</h3>
