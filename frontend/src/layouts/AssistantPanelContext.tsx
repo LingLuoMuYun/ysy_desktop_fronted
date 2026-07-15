@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { ChatAttachment } from "../components/ChatAttachments";
 import { assistantModelsApi } from "../services/assistantModelsApi";
 import { chatApi } from "../services/chatApi";
+import type { ChatProcessEvent } from "../services/chatApi";
 import type { AssistantModelDetail } from "../types/domain";
 import type { ConversationSummary } from "./conversationTypes";
 
@@ -17,6 +18,25 @@ function getTimeLabel() {
     minute: "2-digit",
     hour12: false,
   }).format(new Date());
+}
+
+function mergeProcessEvent(events: ChatProcessEvent[], incoming: ChatProcessEvent) {
+  if (incoming.type === "tool") {
+    const existingIndex = events.findIndex((event) => event.type === "tool" && event.call_id === incoming.call_id);
+    if (existingIndex >= 0) {
+      return events.map((event, index) => index === existingIndex ? { ...event, ...incoming } : event);
+    }
+    return [...events, incoming];
+  }
+
+  if (!incoming.content.trim() && incoming.done) {
+    const hasReasoningDone = events.some((event) =>
+      event.type === "reasoning" && event.done && event.sequence === incoming.sequence,
+    );
+    return hasReasoningDone ? events : [...events, incoming];
+  }
+
+  return [...events, incoming];
 }
 
 // --- 面板 UI 状态 ---
@@ -36,10 +56,16 @@ interface AssistantPanelContextValue {
   editLatestUserMessage: (message: string) => Promise<void>;
   regenerateLatestAnswer: () => Promise<void>;
   switchLatestCandidate: (candidateId: string) => Promise<void>;
+  /** 重命名会话 */
+  renameConversation: (conversationId: string, newTitle: string) => void;
+  /** 删除会话 */
+  deleteConversation: (conversationId: string) => void;
   /** 新建空白会话 */
   createConversation: () => void;
   /** 当前是否正在等待 AI 回复 */
   isStreaming: boolean;
+  /** 正在加载会话详情（切换对话时显示蒙版） */
+  conversationLoading: boolean;
   /** 模型列表 */
   modelList: AssistantModelDetail[];
   /** 当前使用的模型 */
@@ -69,8 +95,11 @@ const AssistantPanelContext = createContext<AssistantPanelContextValue>({
   editLatestUserMessage: async () => undefined,
   regenerateLatestAnswer: async () => undefined,
   switchLatestCandidate: async () => undefined,
+  renameConversation: () => undefined,
+  deleteConversation: () => undefined,
   createConversation: () => undefined,
   isStreaming: false,
+  conversationLoading: false,
   modelList: [],
   currentModel: null,
   switchModel: async () => undefined,
@@ -91,12 +120,15 @@ export function AssistantPanelProvider({
   conversations,
   activeConversationId,
   activeConversationTitle,
+  conversationLoading = false,
   onMessagesChange,
   onNewConversation,
   onSelectConversation,
   onEditLatestUserMessage,
   onRegenerateLatestAnswer,
   onSwitchLatestCandidate,
+  onRenameConversation,
+  onDeleteConversation,
 }: {
   children: ReactNode;
   assistantOpen: boolean;
@@ -107,12 +139,15 @@ export function AssistantPanelProvider({
   conversations: ConversationSummary[];
   activeConversationId: string;
   activeConversationTitle: string;
+  conversationLoading?: boolean;
   onMessagesChange: (messages: ConversationSummary["messages"], title: string) => void;
   onNewConversation: () => void;
   onSelectConversation: (conversationId: string) => void;
   onEditLatestUserMessage: (message: string) => Promise<void>;
   onRegenerateLatestAnswer: () => Promise<void>;
   onSwitchLatestCandidate: (candidateId: string) => Promise<void>;
+  onRenameConversation: (conversationId: string, newTitle: string) => void;
+  onDeleteConversation: (conversationId: string) => void;
 }) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [modelList, setModelList] = useState<AssistantModelDetail[]>([]);
@@ -195,27 +230,38 @@ export function AssistantPanelProvider({
         ? `[对话历史]\n${historyText}\n\n[当前消息]\n${trimmed}`
         : trimmed;
       let replyText = "";
+      let processEvents: ChatProcessEvent[] = [];
+      const updateAssistantDraft = () => {
+        onMessagesChange(
+          initialMessages.map((message) =>
+            message.id === `assistant-${id}` ? { ...message, text: replyText, processEvents } : message,
+          ),
+          nextTitle,
+        );
+      };
 
       const result = await chatApi.sendMessage(
         fullMessage,
         activeConversationId || "default",
         (delta) => {
           replyText += delta;
-          onMessagesChange(
-            initialMessages.map((message) =>
-              message.id === `assistant-${id}` ? { ...message, text: replyText } : message,
-            ),
-            nextTitle,
-          );
+          updateAssistantDraft();
         },
-        undefined,
+        (reasoning) => {
+          processEvents = mergeProcessEvent(processEvents, reasoning);
+          updateAssistantDraft();
+        },
         { modelConfigId: currentModel?.id },
+        (tool) => {
+          processEvents = mergeProcessEvent(processEvents, tool);
+          updateAssistantDraft();
+        },
       );
 
       const finalReply = result.reply || replyText;
       onMessagesChange(
         initialMessages.map((message) =>
-          message.id === `assistant-${id}` ? { ...message, text: finalReply, time: getTimeLabel() } : message,
+          message.id === `assistant-${id}` ? { ...message, text: finalReply, processEvents, time: getTimeLabel() } : message,
         ),
         nextTitle,
       );
@@ -267,8 +313,11 @@ export function AssistantPanelProvider({
       editLatestUserMessage: onEditLatestUserMessage,
       regenerateLatestAnswer: onRegenerateLatestAnswer,
       switchLatestCandidate: onSwitchLatestCandidate,
+      renameConversation: onRenameConversation,
+      deleteConversation: onDeleteConversation,
       createConversation: onNewConversation,
       isStreaming,
+      conversationLoading,
       modelList,
       currentModel,
       switchModel,
@@ -291,6 +340,8 @@ export function AssistantPanelProvider({
       onEditLatestUserMessage,
       sendMessage,
       onNewConversation,
+      onRenameConversation,
+      onDeleteConversation,
       onRegenerateLatestAnswer,
       onSwitchLatestCandidate,
       isStreaming,

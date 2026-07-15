@@ -10,6 +10,7 @@
 .home-toolbar select,
 .home-toolbar [role="button"],
 .home-toolbar strong,
+.window-control-group,
 .titlebar-icon-tip,
 .titlebar-module-label,
 .titlebar-rename {
@@ -18,12 +19,12 @@
 
 .titlebar-right {
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   height: var(--topbar-height);
 }
 
 @media (min-width: 761px) {
   .home-toolbar {
-    padding-right: 154px;
+    padding-right: 14px;
   }
 }

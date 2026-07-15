@@ -32,6 +32,27 @@ export interface ChatStreamTool {
   sequence?: number;
 }
 
+export interface ChatProcessReasoningEvent {
+  type: "reasoning";
+  content: string;
+  done: boolean;
+  sequence?: number;
+}
+
+export interface ChatProcessToolEvent {
+  type: "tool";
+  name: string;
+  status: string;
+  call_id: string;
+  summary?: string;
+  timestamp?: string;
+  duration_ms?: number | null;
+  detail?: string;
+  sequence?: number;
+}
+
+export type ChatProcessEvent = ChatProcessReasoningEvent | ChatProcessToolEvent;
+
 export interface ChatStreamDone {
   type: "done";
   ok: boolean;
@@ -98,6 +119,7 @@ export interface SessionMessage {
   candidate_id?: string;
   candidate_active?: boolean;
   candidate_index?: number;
+  _process_events?: ChatProcessEvent[];
 }
 
 export interface SessionDetail {
@@ -136,6 +158,51 @@ function normalizeDeltaContent(currentReply: string, incomingContent: string) {
     nextReply: `${currentReply}${incomingContent}`,
     chunk: incomingContent,
   };
+}
+
+function maskSensitiveText(value: string) {
+  return value
+    .replace(/\b(sk-[A-Za-z0-9_-]{8,})\b/g, "sk-***")
+    .replace(/\b(api[_-]?key|token|secret|password)\s*[:=]\s*([^\s,;]+)/gi, "$1=***")
+    .replace(/(Authorization\s*:\s*Bearer\s+)[A-Za-z0-9._-]+/gi, "$1***")
+    .replace(/C:\\Users\\([^\\\s]+)\\/gi, "C:\\Users\\***\\")
+    .replace(/\/Users\/([^/\s]+)\//g, "/Users/***/");
+}
+
+function normalizeProcessEvent(raw: unknown): ChatProcessEvent | null {
+  if (typeof raw !== "object" || !raw) return null;
+  const event = raw as Record<string, unknown>;
+  const type = event.type;
+
+  if (type === "reasoning") {
+    return {
+      type: "reasoning",
+      content: typeof event.content === "string" ? maskSensitiveText(event.content) : "",
+      done: event.done === true,
+      sequence: typeof event.sequence === "number" ? event.sequence : undefined,
+    };
+  }
+
+  if (type === "tool") {
+    const name = typeof event.name === "string" && event.name.trim() ? event.name : "tool";
+    const status = typeof event.status === "string" && event.status.trim() ? event.status : "running";
+    const callId = typeof event.call_id === "string" && event.call_id.trim()
+      ? event.call_id
+      : `${name}-${typeof event.sequence === "number" ? event.sequence : Date.now()}`;
+    return {
+      type: "tool",
+      name: maskSensitiveText(name),
+      status: maskSensitiveText(status),
+      call_id: callId,
+      summary: typeof event.summary === "string" ? maskSensitiveText(event.summary) : undefined,
+      timestamp: typeof event.timestamp === "string" ? event.timestamp : undefined,
+      duration_ms: typeof event.duration_ms === "number" ? event.duration_ms : null,
+      detail: typeof event.detail === "string" ? maskSensitiveText(event.detail) : undefined,
+      sequence: typeof event.sequence === "number" ? event.sequence : undefined,
+    };
+  }
+
+  return null;
 }
 
 function getStringField(source: Record<string, unknown>, keys: string[]) {
@@ -314,6 +381,7 @@ function normalizeSessionDetail(raw: unknown): SessionDetail {
             _process_events?: unknown;
           };
           if (typeof item.role !== "string" || typeof item.content !== "string") return null;
+          const rawProcessEvents = Array.isArray(item._process_events) ? item._process_events : [];
           return {
             role: item.role,
             content: item.content,
@@ -321,6 +389,9 @@ function normalizeSessionDetail(raw: unknown): SessionDetail {
             candidate_id: typeof item.candidate_id === "string" ? item.candidate_id : undefined,
             candidate_active: typeof item.candidate_active === "boolean" ? item.candidate_active : undefined,
             candidate_index: typeof item.candidate_index === "number" ? item.candidate_index : undefined,
+            _process_events: rawProcessEvents
+              .map(normalizeProcessEvent)
+              .filter((event): event is ChatProcessEvent => Boolean(event)),
           };
         })
         .filter((message): message is SessionMessage => Boolean(message))
@@ -333,7 +404,8 @@ async function collectStreamResult(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   conversationId: string,
   onDelta?: (text: string) => void,
-  onReasoning?: (text: string) => void,
+  onReasoning?: (event: ChatProcessReasoningEvent) => void,
+  onTool?: (event: ChatProcessToolEvent) => void,
 ): Promise<SendMessageResult> {
   const decoder = new TextDecoder();
   let buffer = "";
@@ -369,7 +441,18 @@ async function collectStreamResult(
     }
 
     if (event.type === "reasoning") {
-      onReasoning?.(event.content);
+      const normalizedEvent = normalizeProcessEvent(event);
+      if (normalizedEvent?.type === "reasoning") {
+        onReasoning?.(normalizedEvent);
+      }
+      return;
+    }
+
+    if (event.type === "tool") {
+      const normalizedEvent = normalizeProcessEvent(event);
+      if (normalizedEvent?.type === "tool") {
+        onTool?.(normalizedEvent);
+      }
       return;
     }
 
@@ -439,11 +522,12 @@ export async function sendMessage(
   message: string,
   conversationId = "default",
   onDelta?: (text: string) => void,
-  onReasoning?: (text: string) => void,
+  onReasoning?: (event: ChatProcessReasoningEvent) => void,
   options: SendMessageOptions = {},
+  onTool?: (event: ChatProcessToolEvent) => void,
 ): Promise<SendMessageResult> {
   const reader = await sendMessageStream(message, conversationId, options);
-  return collectStreamResult(reader, conversationId, onDelta, onReasoning);
+  return collectStreamResult(reader, conversationId, onDelta, onReasoning, onTool);
 }
 
 // ---- 运行时模型切换 ----

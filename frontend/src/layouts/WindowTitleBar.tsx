@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bot, Check, Code2, Grid2X2, History, Pencil, RefreshCw, SquarePen, X } from "lucide-react";
+import { Bot, Check, Code2, Copy, Grid2X2, History, Minus, Pencil, RefreshCw, Square, SquarePen, X } from "lucide-react";
 import { SidebarToggle } from "../components/SidebarToggle";
 
 interface WindowTitleBarProps {
@@ -33,7 +33,15 @@ export function WindowTitleBar({
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [windowMaximized, setWindowMaximized] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const showWindowControls = window.ysyDesktop?.platform === "win32";
+
+  useEffect(() => {
+    if (!showWindowControls) return;
+    void window.ysyDesktop?.isWindowMaximized?.().then(setWindowMaximized);
+    return window.ysyDesktop?.onWindowMaximizeStateChange?.(setWindowMaximized);
+  }, [showWindowControls]);
 
   useEffect(() => {
     if (renaming && renameInputRef.current) {
@@ -213,6 +221,37 @@ export function WindowTitleBar({
             </button>
           </>
         )}
+        {showWindowControls ? (
+          <div className="window-control-group" aria-label="窗口控制">
+            <button
+              className="window-control-button"
+              type="button"
+              title="最小化"
+              aria-label="最小化窗口"
+              onClick={() => void window.ysyDesktop?.minimizeWindow?.()}
+            >
+              <Minus size={16} strokeWidth={1.8} />
+            </button>
+            <button
+              className="window-control-button"
+              type="button"
+              title={windowMaximized ? "还原" : "最大化"}
+              aria-label={windowMaximized ? "还原窗口" : "最大化窗口"}
+              onClick={() => void window.ysyDesktop?.toggleMaximizeWindow?.()}
+            >
+              {windowMaximized ? <Copy size={13} strokeWidth={1.7} /> : <Square size={12} strokeWidth={1.8} />}
+            </button>
+            <button
+              className="window-control-button window-control-button--close"
+              type="button"
+              title="关闭"
+              aria-label="关闭窗口"
+              onClick={() => void window.ysyDesktop?.closeWindow?.()}
+            >
+              <X size={17} strokeWidth={1.7} />
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {/* 右键菜单 */}

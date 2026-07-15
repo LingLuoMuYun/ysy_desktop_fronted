@@ -89,7 +89,7 @@ mindmap
 
 - `idle`：输入框可用。
 - `sending`：请求已发起，等待首个流式事件。
-- `streaming`：接收 `delta`、`tool`、`done`、`error` 事件。
+- `streaming`：接收 `reasoning`、`tool`、`delta`、`done`、`error` 事件。
 - `cancelling`：用户点击停止生成。
 - `editing`：编辑最新用户消息并重新生成。
 - `regenerating`：重新生成最新回答。
@@ -121,7 +121,7 @@ mindmap
 |---|---|---|---|
 |`AIContextProvider`|汇总当前页面上下文|`page`、`route`、`projectId`、`taskId`、`datasetId`、`modelId`、`envId`|标准化上下文对象|
 |`AIConversationStore`|管理会话、消息、候选版本和发送状态|用户输入、会话 ID、channel、上下文|消息列表、当前候选、发送状态、错误|
-|`AIStreamClient`|解析 `/api/chat/stream`、`edit-latest`、`regenerate-latest` 的 NDJSON|请求体、AbortController|`delta/tool/done/error` 事件|
+|`AIStreamClient`|解析 `/api/chat/stream`、`edit-latest`、`regenerate-latest` 的 NDJSON|请求体、AbortController|`reasoning/tool/delta/done/error` 事件|
 |`AIEventSubscriber`|订阅后台事件流|`conversation_id`、`channel`|后台 assistant message、断线重连状态|
 |`AISessionStore`|管理历史会话|sessions 接口|会话列表、会话详情、删除状态|
 |`AIModelConfigStore`|管理 AI 模型配置状态|设置页模型配置接口|默认模型、可用模型、测试状态|
@@ -138,7 +138,7 @@ mindmap
 |`AISidePanel`|项目/任务/数据/模型/设置右侧|复用型侧边 AI 面板|
 |`AIMessageList`|工作台/侧边栏|展示用户消息、AI 回复、错误、建议动作|
 |`AIStreamMessage`|消息列表|渲染流式增量内容和完成态|
-|`AIToolCallItem`|消息列表|展示 `tool` 事件的工具名、状态、摘要、耗时|
+|`AIProcessEventList`|消息列表|默认折叠展示 `reasoning` 推理摘要和 `tool` 工具调用过程|
 |`AIInputBox`|工作台/侧边栏|输入自然语言需求，支持发送和停止|
 |`AIModelSelect`|工作台/侧边栏|选择默认或指定 AI 模型|
 |`AIPermissionModeSelect`|工作台/侧边栏|只读建议、辅助填写、确认后执行|
@@ -170,7 +170,7 @@ mindmap
 
 |来源章节|智能体接口|前端替换位置|输入/参数|输出关注|
 |---|---|---|---|---|
-|对话 - 发起流式对话|`POST /api/chat/stream`|发送新消息|`message`、`conversation_id`、`channel`、`metadata`|`delta` 增量、`tool` 调用、`done.reply`、`tools_used`、`session_key`|
+|对话 - 发起流式对话|`POST /api/chat/stream`|发送新消息|`message`、`conversation_id`、`channel`、`metadata`|`reasoning` 推理摘要、`tool` 调用、`delta` 增量、`done.reply`、`tools_used`、`session_key`|
 |对话 - 编辑最新用户消息并重新生成|`POST /api/chat/edit-latest`|编辑最新用户消息|`message`、`conversation_id`、`channel`、`metadata`|返回格式同流式对话；失败时提示无可编辑消息或会话运行中|
 |对话 - 重新生成最新回答|`POST /api/chat/regenerate-latest`|重新生成按钮|`conversation_id`、`channel`、`metadata`|生成新的 assistant 候选回答|
 |对话 - 切换最新回答候选版本|`POST /api/chat/switch-candidate`|候选版本切换|`conversation_id`、`channel`、`candidate_id`|更新 `candidate_active`|
@@ -202,7 +202,8 @@ mindmap
 前端处理：
 
 - 请求开始后进入 `sending`。
-- 收到首个 `delta` 或 `tool` 后进入 `streaming`。
+- 收到首个 `reasoning`、`tool` 或 `delta` 后进入 `streaming`。
+- `reasoning.content` 作为可展示推理摘要进入当前 assistant 草稿的过程区，默认折叠展示，不作为最终回答正文。
 - `delta.content` 追加到当前 assistant 草稿消息。
 - `tool` 事件追加或更新工具调用列表，按 `call_id` 和 `sequence` 合并展示。
 - `done.ok=true` 时，将草稿消息提交为完成消息，并保存 `conversation_id`、`channel`、`session_key`。
@@ -212,6 +213,7 @@ mindmap
 
 |事件类型|含义|前端处理|
 |---|---|---|
+|`reasoning`|可展示推理摘要|追加到当前 assistant 消息回答上方的过程区，多条合并为“思考过程”，默认折叠、小号灰色展示|
 |`delta`|模型回复文本增量|追加到当前 assistant 消息|
 |`tool`|工具调用状态|展示工具名、状态、摘要、耗时和详情入口|
 |`done`|当前轮完成|结束 loading，保存最终回复和工具列表|
@@ -248,7 +250,7 @@ mindmap
   "candidateId": "candidate_new",
   "candidateActive": true,
   "candidateIndex": 2,
-  "toolCalls": [],
+  "processEvents": [],
   "createdAt": "2026-07-03T10:30:00",
   "source": "stream"
 }
@@ -259,9 +261,11 @@ mindmap
 - `uiMessageId` 由前端生成，只用于渲染和本地列表 diff，不作为后端参数。
 - 当前接口没有 `turn_id` 时，前端按消息顺序生成 `turnIndex`；一个 user 消息和其后的一个或多个 assistant 候选消息归为同一轮。
 - 流式生成时先创建本地 assistant 草稿消息，`delta.content` 追加到草稿 `content`。
-- `tool` 事件按 `call_id`、`sequence` 合并到当前 assistant 草稿的 `toolCalls`。
-- `done.reply` 视为最新 active assistant 的最终 `content`；若本地增量内容与 `done.reply` 不一致，以 `done.reply` 为准。
-- `done.tools_used` 作为最终工具摘要，补齐或覆盖当前 assistant 消息的 `toolCalls` 摘要。
+- `reasoning` 事件追加到当前 assistant 草稿的 `processEvents`；UI 将多条 `reasoning` 合并为一个“思考过程”块并放在回答上方；`done=true` 后如果继续收到新的 `reasoning`，仍继续追加。
+- `tool` 事件按 `call_id` 合并到当前 assistant 草稿的 `processEvents`，详情展示前需要脱敏。
+- `done.reply` 视为最新 active assistant 的最终 `content` 校正来源；若本地增量内容与 `done.reply` 不一致，以 `done.reply` 为准，但 UI 不额外追加展示 `done.reply`。
+- `done.tools_used` 作为最终工具摘要，可补齐或覆盖当前 assistant 消息的 `processEvents` 工具摘要。
+- 历史详情按后端文档固定读取 `_process_events`，前端恢复到 `processEvents`，默认折叠展示。
 - 历史详情若返回 `candidate_id`、`candidate_active`、`candidate_index`，前端按这些字段恢复候选版本 UI。
 - 历史详情缺少候选字段时，前端降级为普通单版本消息，不展示候选切换控件。
 - 历史详情缺少工具记录时，前端只展示最终文本，不回放工具过程。

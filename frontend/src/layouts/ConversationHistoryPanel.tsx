@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Loader2, MessageSquareText, Pencil, Trash2, X } from "lucide-react";
 import { ScrollArea } from "../components/ScrollArea";
+import { formatFullTime, formatRelativeTime } from "../utils/timeFormat";
 import type { ConversationSummary } from "./conversationTypes";
 
 interface ConversationHistoryPanelProps {
@@ -161,7 +162,14 @@ export function ConversationHistoryPanel({
                     title="双击重命名"
                   >
                     <span className="conversation-history__item-title">{conversation.title}</span>
-                    <time>{conversation.updatedAt}</time>
+                    {conversation.id !== activeConversationId && (
+                      <time
+                        className="conversation-history__item-time"
+                        title={formatFullTime(conversation.updatedAt)}
+                      >
+                        {formatRelativeTime(conversation.updatedAt)}
+                      </time>
+                    )}
                   </button>
                   {onDeleteConversation ? (
                     <button

@@ -18,12 +18,13 @@ interface AppShellProps {
 }
 
 const DEFAULT_RIGHT_PANEL_WIDTH = 354;
-const MIN_RIGHT_PANEL_WIDTH = 320;
+const MIN_RIGHT_PANEL_WIDTH = 272;
 const MAX_RIGHT_PANEL_WIDTH = 460;
 const DEFAULT_HISTORY_PANEL_WIDTH = 236;
 const MIN_HISTORY_PANEL_WIDTH = 220;
 const MAX_HISTORY_PANEL_WIDTH = 500;
 const AUTO_COLLAPSE_WIDTH = 960;
+const PANEL_COLLAPSE_OVERDRAG = 28;
 
 const createConversationId = () => `home-conversation-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -155,6 +156,7 @@ function mapSessionDetail(
           index: candidate.candidate_index ?? candidateIndex + 1,
           active: candidate.candidate_active ?? candidateIndex === candidateGroup.length - 1,
           time: candidateTime || previousCandidate?.time || nextUpdatedAt,
+          processEvents: candidate._process_events,
         };
       })
       .sort((a, b) => a.index - b.index);
@@ -171,6 +173,7 @@ function mapSessionDetail(
       candidateId: activeCandidate?.id,
       candidateActive: activeCandidate?.active,
       candidateIndex: activeCandidate?.index,
+      processEvents: activeCandidate?.processEvents,
       candidates: candidates.length > 1 ? candidates : undefined,
     });
   }
@@ -222,6 +225,7 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
   const [homeConversationTitle, setHomeConversationTitle] = useState("");
   const [historyError, setHistoryError] = useState("");
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [conversationLoading, setConversationLoading] = useState(false);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<ConversationSummary | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [rightPanelWidth, setRightPanelWidth] = useState(DEFAULT_RIGHT_PANEL_WIDTH);
@@ -325,36 +329,93 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
     const startX = event.clientX;
     const startWidth = rightPanelWidth;
     const pointerId = event.pointerId;
-    event.currentTarget.setPointerCapture(pointerId);
+    const resizeHandle = event.currentTarget;
+
+    let effectiveStartX = startX;
+    let effectiveStartWidth = startWidth;
+    let latestWidth = startWidth;
+
+    resizeHandle.setPointerCapture(pointerId);
 
     function handlePointerMove(moveEvent: PointerEvent) {
-      const nextWidth = startWidth - (moveEvent.clientX - startX);
-      setRightPanelWidth(Math.min(MAX_RIGHT_PANEL_WIDTH, Math.max(MIN_RIGHT_PANEL_WIDTH, nextWidth)));
+      let nextWidth = effectiveStartWidth - (moveEvent.clientX - effectiveStartX);
+
+      // 缩到 0 后重置基准点，让往回拖能平滑展开
+      if (nextWidth <= 0 && effectiveStartWidth > 0) {
+        effectiveStartX = moveEvent.clientX;
+        effectiveStartWidth = 0;
+        nextWidth = 0;
+      }
+
+      nextWidth = Math.min(MAX_RIGHT_PANEL_WIDTH, Math.max(0, nextWidth));
+      latestWidth = nextWidth;
+      setRightPanelWidth(nextWidth);
+    }
+
+    function cleanup() {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      try {
+        resizeHandle.releasePointerCapture(pointerId);
+      } catch {
+        // Pointer capture may already be released.
+      }
     }
 
     function handlePointerUp() {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
+      cleanup();
+      const collapseThreshold = MIN_RIGHT_PANEL_WIDTH - PANEL_COLLAPSE_OVERDRAG;
+      if (latestWidth < collapseThreshold) {
+        // 松手时宽度低于折叠阈值 → 收起面板
+        setRightPanelWidth(MIN_RIGHT_PANEL_WIDTH);
+        if (isHome) {
+          setResourceOverviewOpen(false);
+        } else {
+          setAssistantOpen(false);
+        }
+      } else if (latestWidth < MIN_RIGHT_PANEL_WIDTH) {
+        // 松手时在缓冲区内 → 弹回最小宽度
+        setRightPanelWidth(MIN_RIGHT_PANEL_WIDTH);
+      }
     }
 
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp, { once: true });
-  }, [rightPanelWidth]);
+  }, [isHome, rightPanelWidth]);
 
   const handleHistoryPanelResize = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     const startX = event.clientX;
     const startWidth = historyPanelWidth;
     const pointerId = event.pointerId;
-    event.currentTarget.setPointerCapture(pointerId);
+    const resizeHandle = event.currentTarget;
+    let didCollapse = false;
+    resizeHandle.setPointerCapture(pointerId);
 
     function handlePointerMove(moveEvent: PointerEvent) {
+      if (didCollapse) return;
       const nextWidth = startWidth + (moveEvent.clientX - startX);
+      if (nextWidth < MIN_HISTORY_PANEL_WIDTH - PANEL_COLLAPSE_OVERDRAG) {
+        didCollapse = true;
+        setHistoryPanelWidth(MIN_HISTORY_PANEL_WIDTH);
+        setConversationHistoryOpen(false);
+        cleanup();
+        try {
+          resizeHandle.releasePointerCapture(pointerId);
+        } catch {
+          // Pointer capture may already be released if the handle unmounted.
+        }
+        return;
+      }
       setHistoryPanelWidth(Math.min(MAX_HISTORY_PANEL_WIDTH, Math.max(MIN_HISTORY_PANEL_WIDTH, nextWidth)));
     }
 
-    function handlePointerUp() {
+    function cleanup() {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
+    }
+
+    function handlePointerUp() {
+      cleanup();
     }
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -388,20 +449,27 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
   const handleSelectConversation = useCallback(async (conversationId: string) => {
     const target = homeConversations.find((conversation) => conversation.id === conversationId);
     if (!target) return;
-    setActiveHomeConversationId(conversationId);
-    if (!target.sessionKey || target.messages.length > 0) return;
 
-    setHistoryLoading(true);
+    // 消息已缓存 → 立即切换（无感）
+    if (!target.sessionKey || target.messages.length > 0) {
+      setActiveHomeConversationId(conversationId);
+      return;
+    }
+
+    // 需要从服务端加载 → 保持当前对话不变，蒙版等待加载完成后再切换
+    setConversationLoading(true);
     setHistoryError("");
     try {
       const detail = await chatApi.getSession(target.sessionKey);
       setHomeConversations((current) => current.map((conversation) =>
         conversation.id === conversationId ? mapSessionDetail(detail, conversation) : conversation,
       ));
+      setActiveHomeConversationId(conversationId);
     } catch (error) {
       setHistoryError(error instanceof Error ? error.message : "会话详情加载失败");
+      setActiveHomeConversationId(conversationId);
     } finally {
-      setHistoryLoading(false);
+      setConversationLoading(false);
     }
   }, [homeConversations]);
 
@@ -532,6 +600,7 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
           conversations={visibleConversations}
           activeConversationId={activeHomeConversation.id}
           activeConversationTitle={activeHomeConversation.title}
+          conversationLoading={conversationLoading}
           toggleSidebar={() => setSidebarCollapsed((isCollapsed) => !isCollapsed)}
           toggleAssistant={() => setAssistantOpen((isOpen) => !isOpen)}
           onMessagesChange={handleHomeMessagesChange}
@@ -540,6 +609,8 @@ export function AppShell({ activeRoute, children, onRouteChange }: AppShellProps
           onEditLatestUserMessage={handleEditLatestUserMessage}
           onRegenerateLatestAnswer={handleRegenerateLatestAnswer}
           onSwitchLatestCandidate={handleSwitchLatestCandidate}
+          onRenameConversation={handleRenameConversation}
+          onDeleteConversation={handleDeleteConversation}
         >
           <WindowTitleBar
             assistantOpen={assistantOpen}

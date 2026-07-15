@@ -182,6 +182,9 @@ function isAllowedNavigation(url) {
     }
     return url.startsWith("file://");
 }
+function emitWindowMaximizedState(window) {
+    window.webContents.send("window:maximized-change", window.isMaximized());
+}
 function createWindow() {
     const { workAreaSize } = screen.getPrimaryDisplay();
     const windowWidth = Math.min(PREFERRED_WINDOW_SIZE.width, workAreaSize.width);
@@ -201,15 +204,9 @@ function createWindow() {
         icon: getAppIconPath(),
         frame: !isWindows,
         titleBarStyle: isWindows ? "hidden" : "default",
-        titleBarOverlay: isWindows
-            ? {
-                color: "#ffffff",
-                symbolColor: "#5f6672",
-                height: 56,
-            }
-            : false,
+        titleBarOverlay: false,
         autoHideMenuBar: !isMac,
-        backgroundColor: "#ffffff",
+        backgroundColor: "#fafaf7",
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,
@@ -234,6 +231,14 @@ function createWindow() {
     mainWindow.on("closed", () => {
         mainWindow = null;
     });
+    mainWindow.on("maximize", () => {
+        if (mainWindow)
+            emitWindowMaximizedState(mainWindow);
+    });
+    mainWindow.on("unmaximize", () => {
+        if (mainWindow)
+            emitWindowMaximizedState(mainWindow);
+    });
     if (DEV_SERVER_URL) {
         void mainWindow.loadURL(DEV_SERVER_URL);
         return;
@@ -245,6 +250,25 @@ app.setName("桌面智算");
 
 void app.whenReady().then(() => {
     ipcMain.handle("environment:request", (_event, request) => requestEnvironmentApi(request));
+    ipcMain.handle("window:minimize", (event) => {
+        BrowserWindow.fromWebContents(event.sender)?.minimize();
+    });
+    ipcMain.handle("window:toggle-maximize", (event) => {
+        const window = BrowserWindow.fromWebContents(event.sender);
+        if (!window)
+            return;
+        if (window.isMaximized()) {
+            window.unmaximize();
+            return;
+        }
+        window.maximize();
+    });
+    ipcMain.handle("window:is-maximized", (event) => {
+        return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
+    });
+    ipcMain.handle("window:close", (event) => {
+        BrowserWindow.fromWebContents(event.sender)?.close();
+    });
     ipcMain.handle("file:select-attachments", async () => {
         const result = await dialog.showOpenDialog({
             properties: ["openFile", "openDirectory", "multiSelections"],

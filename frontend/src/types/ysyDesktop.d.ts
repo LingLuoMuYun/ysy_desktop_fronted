@@ -9,6 +9,11 @@ declare global {
       selectDirectory?: (title?: string) => Promise<string | null>;
       selectFile?: (title?: string) => Promise<string | null>;
       openFile?: (filePath: string) => Promise<void>;
+      minimizeWindow?: () => Promise<void>;
+      toggleMaximizeWindow?: () => Promise<void>;
+      isWindowMaximized?: () => Promise<boolean>;
+      onWindowMaximizeStateChange?: (callback: (isMaximized: boolean) => void) => () => void;
+      closeWindow?: () => Promise<void>;
       requestEnvironment?: (request: unknown) => Promise<{ status: number; data: unknown }>;
     };
   }

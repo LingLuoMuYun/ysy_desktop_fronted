@@ -6,12 +6,14 @@ import {
   SelectedAttachmentList,
   type ChatAttachment,
 } from "../components/ChatAttachments";
+import { ChatProcessEvents } from "../components/ChatProcessEvents";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { PromptToolbar, ProjectSelect, type SkillOption } from "../components/PromptToolbar";
 import { ScrollArea } from "../components/ScrollArea";
 import { useAssistantPanel } from "../layouts/AssistantPanelContext";
 import { suggestionSets, type SuggestionItem } from "../mocks/prototypeData";
 import { chatApi } from "../services/chatApi";
+import type { ChatProcessEvent } from "../services/chatApi";
 
 const CATEGORY_COLORS: Record<SuggestionItem["category"], string> = {
   数据: "#1f9d66",
@@ -30,12 +32,14 @@ export interface ChatMessage {
   candidateId?: string;
   candidateActive?: boolean;
   candidateIndex?: number;
+  processEvents?: ChatProcessEvent[];
   candidates?: Array<{
     id: string;
     text: string;
     index: number;
     active: boolean;
     time?: string;
+    processEvents?: ChatProcessEvent[];
   }>;
 }
 
@@ -75,6 +79,25 @@ export function getGreeting(): string {
   return `${getTimePeriod()}好，今天需要我做些什么？`;
 }
 
+function mergeProcessEvent(events: ChatProcessEvent[], incoming: ChatProcessEvent) {
+  if (incoming.type === "tool") {
+    const existingIndex = events.findIndex((event) => event.type === "tool" && event.call_id === incoming.call_id);
+    if (existingIndex >= 0) {
+      return events.map((event, index) => index === existingIndex ? { ...event, ...incoming } : event);
+    }
+    return [...events, incoming];
+  }
+
+  if (!incoming.content.trim() && incoming.done) {
+    const hasReasoningDone = events.some((event) =>
+      event.type === "reasoning" && event.done && event.sequence === incoming.sequence,
+    );
+    return hasReasoningDone ? events : [...events, incoming];
+  }
+
+  return [...events, incoming];
+}
+
 export function HomePage({
   conversationId = "default",
   messages = [],
@@ -101,7 +124,7 @@ export function HomePage({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { currentModel, refreshModels } = useAssistantPanel();
+  const { conversationLoading, currentModel, refreshModels } = useAssistantPanel();
 
   const currentSuggestions = suggestionSets[currentSetIndex];
   const isChatting = messages.length > 0;
@@ -194,27 +217,38 @@ export function HomePage({
 
     try {
       let replyText = "";
+      let processEvents: ChatProcessEvent[] = [];
+      const updateAssistantDraft = () => {
+        onMessagesChange?.(
+          nextMessages.map((m) =>
+            m.id === assistantId ? { ...m, text: replyText, processEvents } : m,
+          ),
+          nextTitle,
+        );
+      };
       const result = await chatApi.sendMessage(
         trimmed,
         conversationId,
         // onDelta: 流式更新 AI 回复
         (delta) => {
           replyText += delta;
-          onMessagesChange?.(
-            nextMessages.map((m) =>
-              m.id === assistantId ? { ...m, text: replyText } : m,
-            ),
-            nextTitle,
-          );
+          updateAssistantDraft();
         },
-        undefined,
+        (reasoning) => {
+          processEvents = mergeProcessEvent(processEvents, reasoning);
+          updateAssistantDraft();
+        },
         { modelConfigId: currentModel?.id },
+        (tool) => {
+          processEvents = mergeProcessEvent(processEvents, tool);
+          updateAssistantDraft();
+        },
       );
       // 确保最终文本完整
       const finalReply = result.reply || replyText;
       onMessagesChange?.(
         nextMessages.map((m) =>
-          m.id === assistantId ? { ...m, text: finalReply, time: getCurrentTimeLabel() } : m,
+          m.id === assistantId ? { ...m, text: finalReply, processEvents, time: getCurrentTimeLabel() } : m,
         ),
         nextTitle,
       );
@@ -417,6 +451,11 @@ export function HomePage({
 
   return (
     <section className={`home-page${isChatting ? " home-page--chat" : ""}`}>
+      {conversationLoading && (
+        <div className="home-page__loading-mask">
+          <LoaderCircle size={28} />
+        </div>
+      )}
       {!isChatting ? (
         <div className="home-center">
           <h1>
@@ -498,6 +537,7 @@ export function HomePage({
               >
                 <div className="chat-message__bubble">
                   <MessageAttachmentList attachments={message.attachments} />
+                  {message.role === "assistant" ? <ChatProcessEvents events={message.processEvents} /> : null}
                   {editingMessageId === message.id ? (
                     <div className="chat-message__edit">
                       <textarea

@@ -1,6 +1,7 @@
-import { ArrowLeft, ArrowRight, Check, Copy, History, LoaderCircle, MessageSquarePlus, Pencil, RefreshCw, RotateCcw, SendHorizontal, Tag } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, History, LoaderCircle, MessageSquarePlus, Pencil, RefreshCw, RotateCcw, SendHorizontal, Tag, Trash2, X } from "lucide-react";
 import { getTimePeriod } from "../pages/HomePage";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { RouteKey } from "../app/router";
 import {
   mapFilesToChatAttachments,
@@ -8,6 +9,7 @@ import {
   SelectedAttachmentList,
   type ChatAttachment,
 } from "../components/ChatAttachments";
+import { ChatProcessEvents } from "../components/ChatProcessEvents";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { PromptToolbar, ProjectSelect } from "../components/PromptToolbar";
 import { ScrollArea } from "../components/ScrollArea";
@@ -46,6 +48,8 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
     regenerateLatestAnswer,
     switchLatestCandidate,
     createConversation,
+    renameConversation,
+    deleteConversation,
     isStreaming,
     currentModel,
   } = useAssistantPanel();
@@ -53,6 +57,21 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
   const [editingValue, setEditingValue] = useState("");
   const [regeneratingAssistantMessageId, setRegeneratingAssistantMessageId] = useState("");
   const [copiedMessageId, setCopiedMessageId] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [contextMenu, setContextMenu] = useState<{
+    conversationId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const [headerRenaming, setHeaderRenaming] = useState(false);
+  const [headerRenameValue, setHeaderRenameValue] = useState("");
+  const headerRenameInputRef = useRef<HTMLInputElement>(null);
+  const [headerContextMenu, setHeaderContextMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [displayedGreeting, setDisplayedGreeting] = useState("");
   const [greetingComplete, setGreetingComplete] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -172,6 +191,102 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
     });
   };
 
+  // 进入重命名模式时自动聚焦并全选
+  useEffect(() => {
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renamingId]);
+
+  const handleStartRename = useCallback((conversationId: string, title: string) => {
+    setRenamingId(conversationId);
+    setRenameValue(title);
+    setContextMenu(null);
+  }, []);
+
+  const handleSubmitRename = useCallback(() => {
+    if (renamingId && renameValue.trim()) {
+      renameConversation(renamingId, renameValue.trim());
+    }
+    setRenamingId(null);
+    setRenameValue("");
+  }, [renamingId, renameValue, renameConversation]);
+
+  const handleCancelRename = useCallback(() => {
+    setRenamingId(null);
+    setRenameValue("");
+  }, []);
+
+  const handleRenameKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleSubmitRename();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        handleCancelRename();
+      }
+    },
+    [handleSubmitRename, handleCancelRename],
+  );
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, conversationId: string) => {
+      e.preventDefault();
+      setContextMenu({ conversationId, x: e.clientX, y: e.clientY });
+    },
+    [],
+  );
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const handleCloseHeaderContextMenu = useCallback(() => {
+    setHeaderContextMenu(null);
+  }, []);
+
+  // 面板标题重命名
+  useEffect(() => {
+    if (headerRenaming && headerRenameInputRef.current) {
+      headerRenameInputRef.current.focus();
+      headerRenameInputRef.current.select();
+    }
+  }, [headerRenaming]);
+
+  const handleHeaderStartRename = useCallback(() => {
+    setHeaderRenaming(true);
+    setHeaderRenameValue(panelTitle);
+    setHeaderContextMenu(null);
+  }, [panelTitle]);
+
+  const handleHeaderSubmitRename = useCallback(() => {
+    if (headerRenameValue.trim() && activeConversationId) {
+      renameConversation(activeConversationId, headerRenameValue.trim());
+    }
+    setHeaderRenaming(false);
+    setHeaderRenameValue("");
+  }, [headerRenameValue, activeConversationId, renameConversation]);
+
+  const handleHeaderCancelRename = useCallback(() => {
+    setHeaderRenaming(false);
+    setHeaderRenameValue("");
+  }, []);
+
+  const handleHeaderRenameKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleHeaderSubmitRename();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        handleHeaderCancelRename();
+      }
+    },
+    [handleHeaderSubmitRename, handleHeaderCancelRename],
+  );
+
   const handleSwitchAdjacentCandidate = (message: (typeof messages)[number], direction: -1 | 1) => {
     if (!message.candidates) return;
     const activeIndex = message.candidates.findIndex((candidate) => candidate.active);
@@ -197,7 +312,52 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
     <aside className="assistant-panel" aria-label="AI 助手">
       <div className="assistant-header">
         <div className="assistant-header__title-row">
-          <strong title={panelTitle}>{panelTitle}</strong>
+          {headerRenaming ? (
+            <div className="assistant-header__rename">
+              <input
+                ref={headerRenameInputRef}
+                className="assistant-header__rename-input"
+                value={headerRenameValue}
+                onChange={(e) => setHeaderRenameValue(e.target.value)}
+                onKeyDown={handleHeaderRenameKeyDown}
+                onBlur={handleHeaderSubmitRename}
+                placeholder="输入新名称"
+              />
+              <button
+                className="assistant-header__rename-confirm"
+                type="button"
+                title="确认"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleHeaderSubmitRename();
+                }}
+              >
+                <Check size={13} />
+              </button>
+              <button
+                className="assistant-header__rename-cancel"
+                type="button"
+                title="取消"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleHeaderCancelRename();
+                }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            <strong
+              title="双击或右键重命名"
+              onDoubleClick={handleHeaderStartRename}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setHeaderContextMenu({ x: e.clientX, y: e.clientY });
+              }}
+            >
+              {panelTitle}
+            </strong>
+          )}
         </div>
         <div className="assistant-header__tools">
           <button
@@ -238,20 +398,59 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
                 <div
                   className={`assistant-history__item${
                     conversation.id === activeConversationId ? " assistant-history__item--active" : ""
-                  }`}
+                  }${renamingId === conversation.id ? " assistant-history__item--renaming" : ""}`}
                   key={conversation.id}
+                  onContextMenu={(e) => handleContextMenu(e, conversation.id)}
                 >
-                  <button
-                    className="assistant-history__item-main"
-                    type="button"
-                    onClick={() => {
-                      selectConversation(conversation.id);
-                      setHistoryOpen(false);
-                    }}
-                  >
-                    <span>{conversation.title}</span>
-                    <time>{conversation.updatedAt}</time>
-                  </button>
+                  {renamingId === conversation.id ? (
+                    <div className="assistant-history__rename">
+                      <input
+                        ref={renameInputRef}
+                        className="assistant-history__rename-input"
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={handleRenameKeyDown}
+                        onBlur={handleSubmitRename}
+                        placeholder="输入新名称"
+                      />
+                      <button
+                        className="assistant-history__rename-confirm"
+                        type="button"
+                        title="确认"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSubmitRename();
+                        }}
+                      >
+                        <Check size={13} />
+                      </button>
+                      <button
+                        className="assistant-history__rename-cancel"
+                        type="button"
+                        title="取消"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleCancelRename();
+                        }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="assistant-history__item-main"
+                      type="button"
+                      onClick={() => {
+                        selectConversation(conversation.id);
+                        setHistoryOpen(false);
+                      }}
+                      onDoubleClick={() => handleStartRename(conversation.id, conversation.title)}
+                      title="双击重命名"
+                    >
+                      <span>{conversation.title}</span>
+                      <time>{conversation.updatedAt}</time>
+                    </button>
+                  )}
                 </div>
               ))}
             </ScrollArea>
@@ -272,6 +471,7 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
             >
               <div className="chat-message__bubble">
                 <MessageAttachmentList attachments={msg.attachments} />
+                {msg.role === "assistant" ? <ChatProcessEvents events={msg.processEvents} /> : null}
                 {editingMessageId === msg.id ? (
                   <div className="chat-message__edit">
                     <textarea
@@ -449,6 +649,81 @@ export function AssistantPanel({ activeRoute }: AssistantPanelProps) {
         />
         <ProjectSelect className="assistant-project" />
       </div>
+
+      {/* 右键菜单 - 对话列表项 */}
+      {contextMenu &&
+        createPortal(
+          <div
+            className="context-menu-backdrop"
+            onClick={handleCloseContextMenu}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              handleCloseContextMenu();
+            }}
+          >
+            <div
+              className="context-menu"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+              role="menu"
+            >
+              <button
+                className="context-menu__item"
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const conv = conversations.find((c) => c.id === contextMenu.conversationId);
+                  if (conv) handleStartRename(conv.id, conv.title);
+                }}
+              >
+                <Pencil size={13} />
+                重命名
+              </button>
+              <button
+                className="context-menu__item context-menu__item--danger"
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  deleteConversation(contextMenu.conversationId);
+                  handleCloseContextMenu();
+                }}
+              >
+                <Trash2 size={13} />
+                删除
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* 右键菜单 - 面板标题 */}
+      {headerContextMenu &&
+        createPortal(
+          <div
+            className="context-menu-backdrop"
+            onClick={handleCloseHeaderContextMenu}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              handleCloseHeaderContextMenu();
+            }}
+          >
+            <div
+              className="context-menu"
+              style={{ left: headerContextMenu.x, top: headerContextMenu.y }}
+              role="menu"
+            >
+              <button
+                className="context-menu__item"
+                type="button"
+                role="menuitem"
+                onClick={handleHeaderStartRename}
+              >
+                <Pencil size={13} />
+                重命名
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </aside>
   );
 }

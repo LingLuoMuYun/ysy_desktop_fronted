@@ -161,7 +161,7 @@ export function PromptToolbar({
           menuClassName={`prompt-dropdown${skillsSubOpen ? " prompt-dropdown--skills" : ""}`}
           trigger={
             <button
-              className={`round-button${openMenu === "plus" ? " round-button--active" : ""}${plusClassName ? ` ${plusClassName}` : ""}`}
+              className={`prompt-tools__plus${openMenu === "plus" ? " prompt-tools__plus--open" : ""}${plusClassName ? ` ${plusClassName}` : ""}`}
               type="button"
               title="更多选项"
               onClick={() => { setOpenMenu(openMenu === "plus" ? null : "plus"); setSkillsSubOpen(false); }}
@@ -248,7 +248,9 @@ export function PromptToolbar({
             </button>
           ))}
         </PortalDropdown>
+      </div>
 
+      <div className="prompt-tools__right">
         {/* 模型选择 */}
         <PortalDropdown
           open={openMenu === "model"}
@@ -298,9 +300,9 @@ export function PromptToolbar({
             </>
           )}
         </PortalDropdown>
-      </div>
 
-      {sendButton}
+        {sendButton}
+      </div>
     </div>
   );
 }
