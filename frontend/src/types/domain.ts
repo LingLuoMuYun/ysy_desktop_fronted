@@ -1,16 +1,30 @@
 export type StatusTone = "neutral" | "success" | "warning" | "danger" | "info";
 
+export interface ProjectCardAction {
+  label: string;
+  kind?: "primary" | "default" | "danger";
+}
+
 export interface ProjectSummary {
   id: string;
   name: string;
   status: string;
+  statusCode?: string;
   tone: StatusTone;
   description: string;
   path: string;
+  type?: string;
   trainingTasks: number;
   deploymentTasks: number;
   datasetCount: string;
+  modelCount?: number;
+  environmentId?: string | null;
+  environmentName?: string | null;
   updatedAt: string;
+  /** Action button shown inline next to the path (e.g. "打开") */
+  pathAction?: string;
+  /** Action buttons shown on the right side of the card */
+  cardActions?: ProjectCardAction[];
 }
 
 export interface TaskSummary {

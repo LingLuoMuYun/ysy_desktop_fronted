@@ -1,15 +1,28 @@
+/* ============================================================
+   ProjectsPage — 页面级覆盖
+   只覆盖与 globals.css 基线不同的属性，其余继承基线行为：
+   - 卡片 hover（蓝色边框 + 阴影 + 背景）
+   - 操作按钮 hover 显示
+   - 过渡动画
+   ============================================================ */
+
+/* ---- 页面布局 ----
+   覆盖 .workbench-page 的 2 行布局为 3 行。 ---- */
 .project-page {
+  position: relative;
   grid-template-rows: auto auto minmax(0, 1fr);
-  align-content: start;
-  gap: 15px;
-  padding: 18px 38px 14px 36px;
-  background: #fff;
+  gap: 14px;
+  padding: 14px 24px 14px 24px;
+  background: var(--surface);
+  min-height: 0;
+  overflow: hidden;
 }
 
+/* ---- 工具栏：筛选 + 创建 ---- */
 .project-page__toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 18px;
   min-width: 0;
 }
@@ -22,147 +35,175 @@
 }
 
 .project-filter {
-  display: inline-grid;
-  grid-template-columns: auto 1px minmax(56px, 1fr) auto;
+  display: inline-flex;
   align-items: center;
-  gap: 15px;
-  width: 270px;
-  height: 59px;
-  padding: 0 20px;
-  color: #111827;
+  gap: 14px;
+  height: 44px;
+  padding: 0 18px;
+  color: var(--text);
   text-align: left;
-  background: #f6f7f9;
-  border: 0;
-  border-radius: 12px;
+  background: var(--bg-soft);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.project-filter:hover {
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+.project-filter:focus-visible {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(51, 119, 255, 0.12);
+}
+
+.project-filter--open {
+  background: var(--surface);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(51, 119, 255, 0.1);
 }
 
 .project-filter span {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 500;
-  line-height: 1;
+  color: var(--text-muted);
   white-space: nowrap;
-}
-
-.project-filter::after {
-  grid-column: 2;
-  width: 1px;
-  height: 28px;
-  background: #d9dde5;
-  content: "";
 }
 
 .project-filter strong {
-  grid-column: 3;
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
 }
 
 .project-filter svg {
-  grid-column: 4;
-  color: #8b95a5;
+  color: var(--text-soft);
+  flex-shrink: 0;
 }
 
-.project-create-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  height: 48px;
-  padding: 0 22px;
-  color: #fff;
-  font-size: 18px;
-  font-weight: 600;
-  white-space: nowrap;
-  background: #1f6fff;
-  border: 0;
-  border-radius: 9px;
-  cursor: pointer;
-}
-
-.project-create-button:hover {
-  background: #1a63e8;
-}
-
+/* ---- 搜索栏 ---- */
 .project-search {
+  position: relative;
+  z-index: 1;
   display: grid;
-  grid-template-columns: auto 1px minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 15px;
-  height: 60px;
+  gap: 10px;
+  height: 42px;
   min-width: 0;
-  padding: 0 20px;
-  color: #9aa4b3;
-  background: #f6f7f9;
-  border-radius: 12px;
+  flex-shrink: 0;
+  padding: 0 14px;
+  color: var(--text-soft);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.project-search span {
-  width: 1px;
-  height: 29px;
-  background: #d9dde5;
+.project-search:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(51, 119, 255, 0.12);
+}
+
+.project-search svg {
+  color: var(--text-soft);
+  flex-shrink: 0;
 }
 
 .project-search input {
   width: 100%;
   min-width: 0;
-  color: #1f2937;
+  color: var(--text);
   font: inherit;
-  font-size: 18px;
+  font-size: 14px;
   background: transparent;
   border: 0;
   outline: 0;
 }
 
 .project-search input::placeholder {
-  color: #9aa4b3;
+  color: var(--text-soft);
 }
 
+/* ---- 列表外壳 ---- */
 .project-list-shell {
+  position: relative;
+  z-index: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
+  margin-top: 12px;
   overflow: hidden;
-  border: 1px solid #e1e5ec;
-  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
 .project-page .project-grid {
-  gap: 18px;
-  padding: 20px 10px 18px 21px;
-  background: #fff;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  align-content: start;
 }
 
-.project-page .project-card {
-  position: relative;
+.project-state {
   display: grid;
-  grid-template-columns: 60px minmax(0, 1fr) auto;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  min-height: 220px;
+  padding: 32px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.project-state strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.project-state span {
+  max-width: 420px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ---- 项目卡片覆盖 ----
+   基线 (.project-card) 已提供：
+   - 2 列网格 (40px icon + body)
+   - align-items: center
+   - min-height: 88px, padding: 12px 14px
+   - border / radius / transition
+   - hover 蓝色边框 + 阴影 + 背景色
+   这里只覆盖需要不同的属性。
+   ---- */
+.project-page .project-card {
+  grid-template-columns: 34px minmax(0, 1fr);
   align-items: start;
-  gap: 18px;
-  min-height: 191px;
-  padding: 22px 21px;
-  background: #fff;
-  border: 1px solid #dfe4ec;
-  border-radius: 10px;
-  box-shadow: none;
+  gap: 12px;
+  min-height: 80px;
+  padding: 14px 16px;
 }
 
-.project-page .project-card:hover {
-  background: #fff;
-  border-color: #dfe4ec;
-  box-shadow: none;
+.project-page .project-card:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(51, 119, 255, 0.1);
 }
 
+/* ---- 图标 ---- */
 .project-page .project-card__icon {
-  width: 60px;
-  height: 60px;
+  width: 34px;
+  height: 34px;
   color: #fff;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .project-card__icon--blue {
-  background: linear-gradient(135deg, #5b9dff 0%, #2768f3 100%);
+  background: linear-gradient(135deg, #5b9dff 0%, var(--blue) 100%);
 }
 
 .project-card__icon--slate {
@@ -174,48 +215,168 @@
 }
 
 .project-card__icon--green {
-  background: linear-gradient(135deg, #34cf91 0%, #18a76c 100%);
+  background: linear-gradient(135deg, #34cf91 0%, var(--green) 100%);
 }
 
+/* ---- 卡片正文 ---- */
 .project-page .project-card__body {
-  gap: 12px;
+  gap: 5px;
+  min-width: 0;
   padding-right: 0;
 }
 
 .project-page .project-card__heading {
-  gap: 12px;
-}
-
-.project-page .project-card .status-badge {
-  height: 30px;
-  padding: 0 10px;
-  font-size: 16px;
-  font-weight: 500;
-  border: 1px solid currentColor;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .project-page .project-card h2 {
-  max-width: 580px;
-  color: #202633;
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.project-page .project-card p,
-.project-page .project-card__path {
+  min-width: 0;
+  max-width: 360px;
   overflow: hidden;
-  color: #667085;
-  font-size: 18px;
-  line-height: 1.42;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* 状态标签 */
+.project-page .project-card .status-badge {
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11px;
+  border: 1px solid currentColor;
+}
+
+/* 描述与路径 */
+.project-page .project-card p,
+.project-page .project-card__path {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-page .project-card__path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-card__path-action {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  background: var(--blue-soft);
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.project-card__path-action:hover {
+  background: #d4e4ff;
+  color: #1a5fd4;
+}
+
+/* ---- 卡片操作按钮（在 heading 行内，hover 浮现） ---- */
+.project-page .project-card__actions {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.project-page .project-card:hover .project-card__actions,
+.project-page .project-card:focus-within .project-card__actions {
+  opacity: 1;
+  visibility: visible;
+}
+
+.project-card__action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+/* 覆盖 globals 中 .project-card__actions button 的 display:none 和媒体查询中的 font-size:0 */
+.project-page .project-card__actions button {
+  display: inline-flex;
+  width: auto;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.project-card__action-btn:hover {
+  color: var(--text);
+  background: var(--bg-soft);
+  border-color: var(--line-strong);
+}
+
+.project-card__action-btn--primary {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.project-card__action-btn--primary:hover {
+  color: #fff;
+  background: #1a5fd4;
+  border-color: #1a5fd4;
+}
+
+.project-card__action-btn--danger {
+  color: var(--red);
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.project-card__action-btn--danger:hover {
+  color: #fff;
+  background: var(--red);
+  border-color: var(--red);
+}
+
+/* 元数据行 */
 .project-page .project-card__meta {
-  gap: 0;
-  color: #667085;
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 0;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
   line-height: 1.4;
 }
 
@@ -230,43 +391,271 @@
 }
 
 .project-page .project-card__meta span + span::before {
+  flex-shrink: 0;
   width: 1px;
-  height: 22px;
-  margin: 0 18px;
-  background: #dde2ea;
+  height: 12px;
+  margin: 0 10px;
+  background: var(--line);
   content: "";
 }
 
+/* 时间戳（在 meta 行末尾） */
 .project-page .project-card time {
-  align-self: end;
-  padding-bottom: 6px;
-  color: #8b95a5;
-  font-size: 18px;
+  color: var(--text-soft);
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.project-card__edit-placeholder {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  overflow: hidden;
-  pointer-events: none;
-  background: transparent;
-  border: 0;
-  opacity: 0;
+.project-page .project-card__meta time {
+  color: var(--text-soft);
+  font-size: 11px;
+  margin-left: auto;
 }
 
+/* ---- 分页 ---- */
 .project-page__pagination {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 18px;
-  min-height: 42px;
-  padding: 0 20px;
-  color: #8b95a5;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 40px;
+  padding: 0 18px;
+  color: var(--text-soft);
+  font-size: 13px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.project-page__pagination-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.project-page__pagination-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.project-page__pagination-nav button:hover:not(:disabled) {
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-color: var(--blue);
+}
+
+.project-page__pagination-nav button.is-current {
+  color: #fff;
+  font-weight: 600;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.project-page__pagination-nav button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- 筛选下拉菜单 ---- */
+.project-filter-dropdown {
+  min-width: 170px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.project-dialog {
+  width: min(620px, calc(100vw - 32px));
+}
+
+.project-dialog__body {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 20px 22px;
+  overflow: auto;
+}
+
+.project-dialog__field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.project-dialog__field span {
+  color: #4f5b6d;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.project-dialog__field input,
+.project-dialog__field select,
+.project-dialog__field textarea {
+  width: 100%;
+  min-width: 0;
+  color: #1f2329;
+  font: inherit;
   font-size: 14px;
   background: #fff;
-  border-top: 1px solid #edf0f5;
+  border: 1px solid #d9dee8;
+  border-radius: 6px;
+  outline: 0;
+}
+
+.project-dialog__field input,
+.project-dialog__field select {
+  height: 36px;
+  padding: 0 10px;
+}
+
+.project-dialog__field textarea {
+  min-height: 90px;
+  resize: vertical;
+  padding: 9px 10px;
+  line-height: 1.5;
+}
+
+.project-dialog__field input:focus,
+.project-dialog__field select:focus,
+.project-dialog__field textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(51, 119, 255, 0.12);
+}
+
+.project-dialog__error {
+  margin: 0;
+  padding: 9px 10px;
+  color: #b42318;
+  font-size: 13px;
+  line-height: 1.5;
+  background: #fff1f0;
+  border: 1px solid #ffccc7;
+  border-radius: 6px;
+}
+
+.project-detail-dialog {
+  width: min(680px, calc(100vw - 32px));
+}
+
+.project-detail-dialog__body {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 20px 22px;
+}
+
+.project-detail-dialog__summary {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto;
+  justify-content: start;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.project-detail-dialog__summary h3 {
+  margin: 0;
+  overflow: hidden;
+  color: #1f2329;
+  font-size: 18px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-detail-dialog__summary p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #5f6878;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.project-detail-tabs {
+  display: grid;
+  gap: 10px;
+}
+
+.project-detail-tabs__item {
+  display: grid;
+  gap: 6px;
+  padding: 13px 14px;
+  background: #f8fafc;
+  border: 1px dashed #d9dee8;
+  border-radius: 6px;
+}
+
+.project-detail-tabs__item strong {
+  color: #1f2329;
+  font-size: 13px;
+}
+
+.project-detail-tabs__item span {
+  color: #697386;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1280px) {
+  .project-page .project-card {
+    grid-template-columns: 30px minmax(0, 1fr);
+    min-height: 110px;
+  }
+
+  .project-page .project-card__icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .project-page .project-card__actions button,
+  .project-page .project-card__action-btn {
+    width: auto;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+
+  .project-page .project-card__actions {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 1120px) {
+  .project-page .project-card {
+    min-height: 120px;
+  }
+
+  .project-page .project-card__meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .project-page .project-card__meta span + span::before {
+    display: none;
+  }
+
+  .project-page .project-card__heading {
+    flex-wrap: wrap;
+  }
+
+  .project-page .project-card__actions button,
+  .project-page .project-card__action-btn {
+    width: auto;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .project-page .project-card__actions {
+    gap: 6px;
+  }
 }
