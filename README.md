@@ -180,8 +180,8 @@ pnpm run electron:preview
 - [前端 README](frontend/README.md) — 前端工程说明与启动方式
 - [前端 AGENTS.md](frontend/AGENTS.md) — 前端 AI 编码规则
 - [前端 OpenSpec](openspec/frontend/) — 前端 Global Spec、Module Spec、Changes
-- [项目页变更分析总结](docs/development/2026-07-16-project-page-change-analysis.md)
-- [前端经验报告](docs/development/2026-07-16-frontend-experience-report.md)
+- [项目页变更分析总结](docs/development/项目页变更分析总结.md)
+- [前端经验报告](docs/development/前端经验报告.md)
 - [前端接口替换文档](frontend/docs/前端接口替换文档v2.md)
 - [后端接口文档](frontend/docs/后端接口文档.md)
 - [智能体接口文档](frontend/docs/智能体接口.md)

@@ -9,11 +9,14 @@
 - [x] README、OpenSpec 和前端 AGENTS 已补充项目页当前结构与文档入口。
 - [x] 项目分析文档已补充项目业务逻辑、前端调用链和后续接入边界。
 - [x] 已对文档进行第二轮自检，修正过时表述并保留待确认事项。
+- [x] 项目分析文档已扩展为围绕项目总体大纲、项目功能体系、前端架构和关键技术模块的说明，同时保留变更分析部分。
 
 ## 验证记录
 
 - 2026-07-16：运行 `pnpm run typecheck` 通过。
 - 2026-07-16：未启动 Vite / Electron 做截图验证；当前仅完成静态类型验证。
 - 2026-07-16：缩小项目详情弹窗尺寸和字号后，复跑 `pnpm run typecheck` 通过。
-- 2026-07-16：新增 `docs/development/2026-07-16-project-page-change-analysis.md` 和 `docs/development/2026-07-16-frontend-experience-report.md`。
+- 2026-07-16：新增项目分析与前端经验文档，当前文档路径为 `docs/development/项目页变更分析总结.md` 和 `docs/development/前端经验报告.md`。
 - 2026-07-16：更新 README、OpenSpec README、前端 AGENTS 和项目分析文档后，运行 `git diff --check` 通过，仅有 LF/CRLF 提示；复跑 `pnpm run typecheck` 通过。
+- 2026-07-16：基于中文文档路径 `docs/development/项目页变更分析总结.md` 扩展项目总体大纲、项目功能体系和前端重要技术模块，并保留原变更分析结构。
+- 2026-07-16：本轮文档扩展后运行 `git diff --check` 通过，仅有 LF/CRLF 提示；复跑 `pnpm run typecheck` 通过，期间 pnpm 检查自身更新时出现 registry 访问失败提示，不影响 TypeScript 检查结果。

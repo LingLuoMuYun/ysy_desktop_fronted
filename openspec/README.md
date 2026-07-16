@@ -57,4 +57,4 @@ openspec/changes/<change-id>/
 - 修改一级模块、核心实体、状态机、高风险动作边界时，必须同步评估 Global / Module Spec。
 - 完成实现后更新 `tasks.md` 和验收记录；只改代码不更新任务状态视为未收口。
 - 不再使用 `docs/specs/`；不要重新创建平行 specs 体系。
-- 前端项目页相关文档沉淀在 `docs/development/2026-07-16-project-page-change-analysis.md` 和 `docs/development/2026-07-16-frontend-experience-report.md`，后续继续开发项目详情、任务记录或模型资产时应同步更新对应 Change 和分析文档。
+- 前端项目页相关文档沉淀在 `docs/development/项目页变更分析总结.md` 和 `docs/development/前端经验报告.md`，后续继续开发项目详情、任务记录或模型资产时应同步更新对应 Change 和分析文档。
